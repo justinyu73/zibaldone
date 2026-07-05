@@ -63,7 +63,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEQjZDNDA3NTE2RjI2ClJXUW1iMUVIeExiTkFEazJ4UFhzbjA4K1AwR2hTRFltaDdPNFd0VG9haERIL29xTyt3Z1dnYmFCCg==",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc0MDlFQ0ZGODlFN0NENkMKUldSc3plZUovK3dKZE9qSjExVGUvZW5GZHBITi9nb01COVVseWVka3A1WHdBdWNkV0hMaWVvRHkK",
       "endpoints": [
         "https://api.github.com/repos/justinyu73/zibaldone/releases/latest"
       ]
