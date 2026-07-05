@@ -1,0 +1,84 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:  # 讓 release.yml 當發版 gate 重用同一套 CI（不複製、單一真相）
+
+env:
+  # GitHub forces Node 24 for actions from 2026-06-16; opt in early so the
+  # switch can't break CI silently on the deadline.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  product-readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/product_readiness_check.py
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt
+      - run: ./run_tests.sh
+        working-directory: backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg  # asr.spec.js 合成測試音檔 + 後端 preflight 需要
+      - run: pip install -r backend/requirements.txt
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npx playwright test
+        working-directory: frontend
+        env:
+          CI: 'true'
+      # Surface behavioral evidence (acting-evaluator): retain screenshots/traces
+      # even on failure, so a human reviews captured evidence instead of re-running
+      # the app by hand. Capture only — accept/ship stays a human call.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: behavioral-evidence
+          path: |
+            frontend/asr-preview.png
+            frontend/test-results/
+          retention-days: 14
+          if-no-files-found: ignore

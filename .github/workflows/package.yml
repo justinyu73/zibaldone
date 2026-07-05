@@ -1,0 +1,89 @@
+name: package
+
+# Personal-use desktop packaging (manual trigger): builds Mac (.dmg) and
+# Windows (.msi/.exe) bundles on GitHub runners — dev environment stays WSL.
+# The paths-filtered push trigger exists because dispatch-only workflows can
+# fail to register on GitHub's side; editing this file re-registers and also
+# serves as the packaging verification run.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main] # tag pushes belong to release.yml; without this, every
+    paths:           # version tag double-triggered package (and wasted minutes)
+      - '.github/workflows/package.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            sep: ';'
+            ext: '.exe'
+            bundles: msi,nsis
+          - os: macos-latest # Apple Silicon; Intel Mac would need macos-13
+            sep: ':'
+            ext: ''
+            bundles: dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri
+      - name: test Rust sidecar lifecycle
+        run: cargo test --lib --locked
+        working-directory: frontend/src-tauri
+        env:
+          TAURI_CONFIG: '{"bundle":{"externalBin":[]}}'
+      - run: pip install -r backend/requirements.txt pyinstaller
+      - name: build sidecar (PyInstaller, per-OS)
+        shell: bash
+        run: |
+          cd backend
+          pyinstaller --onefile --name video-intake-fastapi-sidecar \
+            --add-data "enabled_models.json${{ matrix.sep }}." \
+            --collect-submodules uvicorn --collect-submodules anyio \
+            --collect-data trafilatura --collect-data justext --collect-data tld --collect-data certifi \
+            --collect-submodules anthropic --collect-submodules google.genai \
+            --copy-metadata anthropic --copy-metadata google-genai \
+            --hidden-import uvicorn.logging --hidden-import uvicorn.loops.auto \
+            --hidden-import uvicorn.protocols.http.auto \
+            --hidden-import uvicorn.protocols.websockets.auto --hidden-import uvicorn.lifespan.on \
+            sidecar_main.py
+          TRIPLE="$(rustc -vV | sed -n 's/host: //p')"
+          mkdir -p ../frontend/src-tauri/binaries
+          # RC/test package must match release: production sidecar only.
+          cp "dist/video-intake-fastapi-sidecar${{ matrix.ext }}" \
+             "../frontend/src-tauri/binaries/video-intake-fastapi-sidecar-${TRIPLE}${{ matrix.ext }}"
+      - run: npm ci
+        working-directory: frontend
+      - name: tauri build
+        run: npx tauri build --bundles ${{ matrix.bundles }} --config '{"bundle":{"externalBin":["binaries/video-intake-fastapi-sidecar"]}}'
+        working-directory: frontend
+        env:
+          # createUpdaterArtifacts makes updater-enabled targets (nsis/msi)
+          # require the signing key even for test packages
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      - name: enforce release size budget
+        run: python3 scripts/product_readiness_check.py --artifacts frontend/src-tauri/target/release/bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.os }}
+          path: |
+            frontend/src-tauri/target/release/bundle/msi/*.msi
+            frontend/src-tauri/target/release/bundle/nsis/*.exe
+            frontend/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
