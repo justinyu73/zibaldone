@@ -10,6 +10,10 @@ Local-first, works **without any API key**, and every AI-generated claim carries
 
 **繁體中文使用者：** UI 為繁體中文——這是作者日常使用的真實產品，不是 demo。
 
+![Paste a YouTube URL, review free captions, generate an AI draft with a local model, save into your vault](docs/assets/demo-hero.gif)
+
+*Real recording: free captions → local `gemma3:4b` draft → note saved to the vault. Total cloud cost: $0.*
+
 ## Why it exists
 
 Most "AI note" tools are thin wrappers around one cloud API. Zibaldone is built the
@@ -38,6 +42,11 @@ other way around:
 
 Plus: full-text vault search, an intake inbox with retirement flow, per-model cost
 tracking (local models report $0), and an in-app updater.
+
+![Drop a meeting audio file, watch the local ASR job, get minutes where every action item carries a clickable timestamp](docs/assets/demo-meeting.gif)
+
+*Meeting lane: local Whisper ASR → reviewable draft → every action item and decision
+anchored with a `[mm:ss]` capsule that seeks the audio player.*
 
 ## Model routes (the no-key ladder)
 
@@ -70,7 +79,7 @@ See [docs/install/](docs/install/) for full platform guides and troubleshooting.
 
 ## Architecture (5-minute tour)
 
-```
+```text
 ┌────────────┐   invoke/HTTP    ┌──────────────────┐   spawn+reap   ┌───────────────┐
 │ React UI   │ ───────────────▶ │ Tauri shell (Rust)│ ─────────────▶ │ FastAPI sidecar│
 │ (webview)  │ ◀─────────────── │ session token,    │                │ (PyInstaller)  │

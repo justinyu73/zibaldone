@@ -11,9 +11,9 @@ import sys
 from pathlib import Path
 
 
+# AGENTS.md（agent 操作協議）＝私有治理物，不列產品必要檔：公開樹刻意不含它。
 REQUIRED_PATHS = (
     "README.md",
-    "AGENTS.md",
     "backend/requirements.txt",
     "frontend/package-lock.json",
     "frontend/src-tauri/Cargo.lock",
