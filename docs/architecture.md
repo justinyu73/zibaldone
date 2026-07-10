@@ -8,7 +8,7 @@ references are clickable from the repo root.
 Three processes, one trust boundary:
 
 ```
-React (webview) ──HTTP + bearer──▶ FastAPI sidecar (PyInstaller, 127.0.0.1:8766)
+React (webview) ──HTTP + bearer──▶ FastAPI sidecar (PyInstaller onedir, 127.0.0.1:8766)
       ▲                                    ▲
       │ invoke                             │ spawn / reap / respawn
       └──────────── Tauri shell (Rust) ────┘
@@ -17,9 +17,13 @@ React (webview) ──HTTP + bearer──▶ FastAPI sidecar (PyInstaller, 127.0
 - The **Tauri shell** generates a per-launch session token, exports it to the
   sidecar's environment, and hands it to the webview via an `invoke` command.
   Every non-health API call must carry it; the backend binds to loopback only.
-- The **sidecar** is a single PyInstaller binary: FastAPI app assembled in
+- The **sidecar** is a PyInstaller `--onedir` tree (executable + `_internal/`)
+  bundled as a Tauri resource: FastAPI app assembled in
   [`backend/main.py`](../backend/main.py) (~100 lines — bootstrap, middleware,
-  router mounts) over feature routers and services.
+  router mounts) over feature routers and services. It ships as a directory rather
+  than a single `--onefile` binary because onefile re-extracts its ~200 MB payload
+  to a temp dir on *every* launch; shipping the tree unpacked cut cold start
+  (spawn → `/api/health`) from ~1.3 s to ~0.6 s (local Linux measurement).
 
 ## Sidecar lifecycle (the interesting part)
 
@@ -37,6 +41,13 @@ The reap in [`lib.rs`](../frontend/src-tauri/src/lib.rs) is therefore two-layere
    each is name-verified as one of our sidecar binaries before being killed.
    This catches orphans whose pid escaped the file (e.g. the pid file was
    overwritten by a later spawn while an older sidecar survived).
+
+Spawn differs by build: **dev** launches a source-backed shell sidecar via Tauri's
+`externalBin` (no rebuild between edits); **release** resolves the onedir executable
+under the app's resource dir and spawns it directly with `std::process` — the shell
+capability scope can't statically express a per-machine resource path, so this
+mirrors `open_log_dir`'s intentional Rust-side `Command`. Reaping stays identical
+across both: it keys off the recorded pid, name-verified.
 
 The same philosophy covers updates: installing kills the sidecar first (Windows
 file locks), and a failed install **respawns** it so the session keeps a working
@@ -96,7 +107,7 @@ never looks installed. Neither ships in the installer; the release budget
 - **Surface contract**: all 77 endpoint method/path pairs are pinned in one test.
   Router refactors (this codebase was split from a 3,700-line `main.py` in six
   verbatim-move batches) can't silently change the API.
-- **Layers**: 340+ backend unit tests (no network, providers mocked), 45 frontend
+- **Layers**: 340+ backend unit tests (no network, providers mocked), 47 frontend
   unit tests, 21 Playwright E2E cases against a real spawned backend, Rust
   lifecycle tests, plus a product-readiness check (tracked-tree size, forbidden
   paths, artifact budget) that runs in CI and at release.

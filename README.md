@@ -100,6 +100,11 @@ Highlights worth reading the code for:
   force-quit orphan squatting the fixed port with a stale session token makes every
   request 401 and looks exactly like a broken install. Found on a real machine;
   fixed with a regression test.
+- **Onedir cold start** ([`lib.rs`](frontend/src-tauri/src/lib.rs), [`release.yml`](.github/workflows/release.yml)):
+  the sidecar ships as a PyInstaller `--onedir` tree bundled as a Tauri resource, not
+  a `--onefile` binary that re-extracts ~200 MB to a temp dir on every launch —
+  cutting spawn → `/api/health` from ~1.3 s to ~0.6 s. Release spawns the inner
+  executable directly; dev keeps the source-backed shell sidecar.
 - **API surface contract** ([`test_api_surface_contract.py`](backend/tests/test_api_surface_contract.py)):
   all 77 method/path pairs are pinned; refactors that add, drop, or rename an
   endpoint fail immediately.
