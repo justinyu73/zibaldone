@@ -1217,3 +1217,21 @@ button.primary.gated-action:not(:disabled) { box-shadow: 0 0 0 1px rgba(217, 130
 .retire-confirm { border: 1px solid var(--warn-ink); background: var(--warn-bg); color: var(--warn-ink); border-radius: var(--radius); padding: 12px 14px; }
 .retire-confirm p { margin: 0 0 8px; }
 .retire-confirm-actions { display: flex; gap: 8px; }
+
+/* ==== shared brand/provider glyph ==== */
+.brand-glyph { width: 22px; height: 22px; border-radius: 7px; display: inline-grid; place-items: center; flex: 0 0 auto; }
+.bg-claude { background: color-mix(in srgb, #d97757 18%, transparent); color: #d97757; }
+.bg-openai { background: color-mix(in srgb, #10a37f 18%, transparent); color: #10a37f; }
+.bg-gemini { background: color-mix(in srgb, #4574f0 18%, transparent); color: #4574f0; }
+.bg-ollama { background: color-mix(in srgb, #2f9e6f 18%, transparent); color: #2f9e6f; }
+.bg-generic { background: var(--brand-soft); color: var(--brand); }
+.provider-tabs button { display: inline-flex; align-items: center; gap: 7px; }
+
+/* inbox rows: keep source glyph left, content flowing next to it */
+.radar-item { justify-content: flex-start; }
+.radar-item .li-main { flex: 1; min-width: 0; }
+.inbox-row .src-glyph, .radar-item .src-glyph { width: 26px; height: 26px; }
+.library-list-scroll .list-item { justify-content: flex-start; }
+.library-list-scroll .list-item .li-main { flex: 1; min-width: 0; }
+.library-list-scroll .list-item .li-type { margin-left: auto; }
+.library-list-scroll .list-item .src-glyph { width: 26px; height: 26px; }

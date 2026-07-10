@@ -4,6 +4,7 @@ import {
   ShieldCheck, X,
 } from 'lucide-react'
 import { deriveVaultPaths } from '../../paths'
+import SourceGlyph, { sourceTypeFromPath } from '../../components/SourceGlyph'
 import NoteReader from '../../NoteReader'
 import { API, apiFetch, postJson } from '../../app/api'
 import StatusMessage from '../../components/status/StatusMessage'
@@ -323,6 +324,7 @@ export default function LibraryView({ settings, onGo, ready = true }) {
                         onClick={() => openRecord(r)}
                         aria-pressed={active}
                       >
+                        <SourceGlyph type={sourceTypeFromPath(r.path || r.source_type)} />
                         <span className="li-main">
                           <span className="li-title">{r.title || r.canonical_id}</span>
                           {r.snippet && <span className="li-snippet">{r.snippet}</span>}

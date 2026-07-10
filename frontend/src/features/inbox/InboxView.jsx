@@ -4,6 +4,7 @@ import {
   Save, Settings, ShieldCheck, Trash2,
 } from 'lucide-react'
 import { deriveVaultPaths } from '../../paths'
+import SourceGlyph, { sourceTypeFromPath } from '../../components/SourceGlyph'
 import NoteReader from '../../NoteReader'
 import { API, apiFetch, postJson } from '../../app/api'
 import StatusMessage from '../../components/status/StatusMessage'
@@ -335,6 +336,7 @@ export default function InboxView({ settings, active = true, onCount, onGo, read
               {radarItems.map((c) => (
                 <button key={c.id} className={`list-item radar-item ${radarSelected?.id === c.id ? 'active' : ''}`}
                   onClick={() => selectCandidate(c)} aria-pressed={radarSelected?.id === c.id}>
+                  <SourceGlyph type="article" />
                   <span className="li-main">
                     <span className="li-title">{c.important && <span className="state-chip warn">重要</span>}{c.title}</span>
                     <span className="li-snippet">{c.source}{c.heat ? `・${c.heat}` : ''}</span>
@@ -497,6 +499,7 @@ export default function InboxView({ settings, active = true, onCount, onGo, read
                         checked={checked.includes(item.path)}
                         onChange={() => toggleChecked(item.path)}
                       />
+                      <SourceGlyph type={sourceTypeFromPath(item.path)} />
                       <button className={`list-item ${selected?.path === item.path ? 'active' : ''}`}
                         onClick={() => open(item)} aria-pressed={selected?.path === item.path}>
                         <span className="li-title">{item.title}</span>
