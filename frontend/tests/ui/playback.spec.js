@@ -68,8 +68,8 @@ test('summary model dropdown shows per-model cost tag (付費/免費)', async ({
   await page.click('nav.side-nav button[aria-label="收錄"]')
   await page.getByRole('button', { name: '會議筆記音檔' }).click()
   // 摘要模型下拉（自訂下拉）的選項應帶各自計費標（雲端=付費 / 本地=免費 / 訂閱=零成本），證明成本可見
-  await page.click('.summary-model-pick .model-select-toggle')
+  await page.click('.voice-workbench .summary-model-pick .model-select-toggle')
   await expect.poll(async () =>
-    page.locator('.summary-model-pick .model-select-menu [role="option"]').allTextContents()
+    page.locator('.voice-workbench .summary-model-pick .model-select-menu [role="option"]').allTextContents()
   ).toEqual(expect.arrayContaining([expect.stringMatching(/付費|免費|零成本/)]))
 })
