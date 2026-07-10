@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { apiFetch } from '../../app/api'
 
-const COST_RANGES = [['today', '今日'], ['week', '本週'], ['month', '本月']]
+const COST_RANGES = [['today', '當天'], ['week', '當週'], ['month', '當月']]
 
 // 國際幣別：rate 為示意常數（非即時匯率），USD 為資料真值來源。
 export const CURRENCIES = {
