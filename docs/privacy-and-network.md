@@ -14,6 +14,8 @@ The app does not require a hosted account and does not include telemetry.
 | Action | Network destination | Trigger |
 |---|---|---|
 | YouTube caption retrieval | YouTube/caption endpoints | User previews or imports a YouTube source |
+| Captionless-video ASR | YouTube (audio download) → local whisper.cpp | User clicks the ASR fallback on a captionless video (no cloud; local transcription) |
+| Captionless-video OCR | YouTube (sampled frames) → OCR provider | User clicks the OCR fallback on a captionless video (reads hard-burned subtitles) |
 | Article extraction | The URL supplied by the user | User requests article fetch |
 | Cloud transcription | Selected transcription provider | User selects a cloud/paid ASR route and confirms |
 | AI translation/summary | OpenAI, Anthropic, or Google | User selects a cloud model and executes the action |
