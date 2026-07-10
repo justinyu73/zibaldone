@@ -77,9 +77,42 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
       const zh = data.transcript?.zh_text || ''
       setFetched(data); setEnText(en); setZhText(zh)
       setDraft((d) => ({ ...d, title: data.meta?.title || '' }))
-      setStatus({ type: en || zh ? 'ok' : 'error', message: en || zh ? '字幕已取得，可校正後生成草稿。' : '此來源沒有可用字幕，可切換上方「本機音檔」分頁上傳音檔轉錄。' })
+      setStatus({ type: en || zh ? 'ok' : 'error', message: en || zh ? '字幕已取得，可校正後生成草稿。' : '此來源沒有可用字幕。可用下方「下載音檔並轉錄（ASR）」直接本機轉錄。' })
     } catch (error) {
       setStatus({ type: 'error', message: error.message })
+    } finally { setBusy('') }
+  }
+
+  // 無字幕 fallback（收斂在影片筆記流程內，非獨立分頁）：使用者明確觸發。
+  // ASR：下載音檔→本機 whisper 轉錄；轉錄稿當原文字幕，續走既有 translate→summarize。
+  async function runVideoAsr() {
+    if (!extractVideoId(url)) return setStatus({ type: 'error', message: '請先輸入有效 URL' })
+    setBusy('asr'); setStatus({ type: 'info', message: '下載音檔並本機轉錄中（長影片較久，離線免金鑰）...' })
+    try {
+      const data = await postJson('/app/video-audio-asr', { url })
+      const t = (data.transcript || '').trim()
+      if (!t) throw new Error('轉錄結果為空（此來源可能無可辨識語音）')
+      setEnText(t); setLang('en')
+      setStatus({ type: 'ok', message: '已用本機語音轉錄產生逐字稿，可校正後生成草稿。' })
+    } catch (error) {
+      setStatus({ type: 'error', message: `語音轉錄失敗：${error.message}` })
+    } finally { setBusy('') }
+  }
+
+  // OCR（rung 3）：無字幕且畫面有硬字幕時，讀 6 幀畫面文字。需雲端 provider。
+  async function runVideoOcr() {
+    if (!extractVideoId(url)) return setStatus({ type: 'error', message: '請先輸入有效 URL' })
+    setBusy('ocr'); setStatus({ type: 'info', message: '讀取影片畫面硬字幕（OCR，需雲端 provider）...' })
+    try {
+      const data = await postJson('/production-extractor', {
+        url, mode: 'real', user_authorized_media: true, allow_provider_ocr: true, confirm_report_only: true,
+      })
+      const text = (data.segments || []).map((s) => s.text).filter(Boolean).join('\n').trim()
+      if (!text) throw new Error('OCR 未取得可用文字（此來源畫面可能無硬字幕）')
+      setEnText(text); setLang('en')
+      setStatus({ type: 'ok', message: '已用畫面 OCR 產生文字，可校正後生成草稿。' })
+    } catch (error) {
+      setStatus({ type: 'error', message: `OCR 失敗：${error.message}` })
     } finally { setBusy('') }
   }
 
@@ -228,6 +261,15 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
               aria-label={lang === 'en' ? '原文字幕審查區' : '中文字幕審查區'}
               onChange={(e) => (lang === 'en' ? setEnText(e.target.value) : setZhText(e.target.value))}
               placeholder="字幕內容（抓取後可校正）。這裡是 AI 摘要前的人為審查區。" />
+            {fetched && !enText && !zhText && (
+              <div className="caption-fallback">
+                <div className="settings-note">字幕優先；此來源無可用字幕。可用進階本機能力（免金鑰、離線；收斂在影片筆記流程內）：</div>
+                <div className="panel-actions">
+                  <button onClick={runVideoAsr} disabled={busy === 'asr'}><Captions size={16} />{busy === 'asr' ? '轉錄中...' : '下載音檔並轉錄（ASR）'}</button>
+                  <button onClick={runVideoOcr} disabled={busy === 'ocr'}><FileText size={16} />{busy === 'ocr' ? '讀取中...' : '讀畫面硬字幕（OCR）'}</button>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="panel note-panel">

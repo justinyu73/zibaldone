@@ -9,7 +9,7 @@ describe('recoveryHint', () => {
 
   it('routes known failures to actionable recovery', () => {
     expect(recoveryHint({ type: 'error', message: 'daily cap exceeded' })).toContain('每日上限')
-    expect(recoveryHint({ type: 'error', message: '字幕不可用' })).toContain('不會自動改走 ASR')
+    expect(recoveryHint({ type: 'error', message: '字幕不可用' })).toContain('缺字幕時可用下方 ASR')
     expect(recoveryHint({ type: 'error', message: 'backend network error' })).toContain('sidecar')
   })
 
