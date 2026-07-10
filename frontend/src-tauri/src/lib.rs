@@ -326,6 +326,50 @@ fn resolve_sidecar_exe(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
 /// via std::process is intentional — like open_log_dir, it is not gated by the
 /// shell capability scope, which cannot statically express a per-machine resource
 /// path. Reaping stays precise: it uses the recorded pid, name-verified.
+/// Restore the user's real PATH for the sidecar. A packaged macOS app is launched
+/// by LaunchServices with a minimal PATH (no Homebrew, nvm, pnpm, …), so the tools
+/// the sidecar shells out to go missing: ffmpeg (video/meeting ASR + OCR frame
+/// grab) and the subscription CLIs (claude/codex/gemini). Resolve PATH from a
+/// login+interactive shell — sourcing the user's rc files, matching a terminal —
+/// with common tool dirs prepended as a fallback.
+#[cfg(all(unix, not(debug_assertions)))]
+fn sidecar_path_env() -> String {
+    // Wrap PATH in unique markers: an interactive login shell may print an MOTD /
+    // rc-file banner (oh-my-zsh, version managers, Ubuntu MOTD) to stdout, so we
+    // extract the value between markers instead of trusting the whole stdout.
+    let base = std::env::var("SHELL")
+        .ok()
+        .and_then(|shell| {
+            std::process::Command::new(shell)
+                .args(["-ilc", "printf 'ZBPATHSTART%sZBPATHEND' \"$PATH\""])
+                .output()
+                .ok()
+        })
+        .and_then(|out| {
+            let text = String::from_utf8_lossy(&out.stdout);
+            let start = text.find("ZBPATHSTART")? + "ZBPATHSTART".len();
+            let end = text[start..].find("ZBPATHEND")? + start;
+            Some(text[start..end].to_string())
+        })
+        .filter(|path| !path.is_empty())
+        .unwrap_or_else(|| std::env::var("PATH").unwrap_or_default());
+
+    let home = std::env::var("HOME").unwrap_or_default();
+    let common = [
+        "/opt/homebrew/bin".to_string(),
+        "/usr/local/bin".to_string(),
+        format!("{home}/.local/bin"),
+        format!("{home}/Library/pnpm"),
+    ];
+    let mut parts: Vec<String> = Vec::new();
+    for dir in common.into_iter().chain(base.split(':').map(str::to_string)) {
+        if !dir.is_empty() && !parts.iter().any(|existing| existing == &dir) {
+            parts.push(dir);
+        }
+    }
+    parts.join(":")
+}
+
 #[cfg(not(debug_assertions))]
 fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<SidecarSession>) {
     use std::io::{BufRead, BufReader};
@@ -335,12 +379,18 @@ fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<
     let Some(exe) = resolve_sidecar_exe(app) else {
         return;
     };
-    let mut child = match Command::new(&exe)
-        .env("YT_NOTE_APP_SESSION_TOKEN", session.token.clone())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+    let mut command = Command::new(&exe);
+    command.env("YT_NOTE_APP_SESSION_TOKEN", session.token.clone());
+    // macOS/Linux packaged launch inherits a stripped PATH → give the sidecar the
+    // user's real PATH so ffmpeg + subscription CLIs resolve. Windows GUI apps
+    // inherit the full system PATH, so no override there.
+    #[cfg(unix)]
     {
+        let path = sidecar_path_env();
+        log::info!("[sidecar] resolved PATH: {} entries", path.split(':').filter(|part| !part.is_empty()).count());
+        command.env("PATH", path);
+    }
+    let mut child = match command.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
         Ok(child) => child,
         Err(err) => {
             log::error!("[sidecar] failed to spawn {exe:?}: {err}");
