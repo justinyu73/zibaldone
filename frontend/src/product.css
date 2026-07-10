@@ -1225,7 +1225,32 @@ button.primary.gated-action:not(:disabled) { box-shadow: 0 0 0 1px rgba(217, 130
 .bg-gemini { background: color-mix(in srgb, #4574f0 18%, transparent); color: #4574f0; }
 .bg-ollama { background: color-mix(in srgb, #2f9e6f 18%, transparent); color: #2f9e6f; }
 .bg-generic { background: var(--brand-soft); color: var(--brand); }
+.bg-cli { background: color-mix(in srgb, #6366f1 18%, transparent); color: #6366f1; }
 .provider-tabs button { display: inline-flex; align-items: center; gap: 7px; }
+
+/* ==== model select (custom dropdown: LOGO + short label) ==== */
+.model-select { position: relative; }
+.model-select-toggle { width: 100%; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1.5px solid var(--line-strong);
+  border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
+.model-select-toggle:hover { border-color: var(--brand); }
+.model-select-toggle:disabled { opacity: .6; cursor: default; }
+.model-select-toggle:focus-visible { outline: 0; box-shadow: var(--ring); border-color: var(--brand); }
+.ms-caret { margin-left: 4px; color: var(--muted); flex: 0 0 auto; }
+.model-select-menu { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-soft); padding: 5px; max-height: 320px; overflow-y: auto; }
+.model-select-menu button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; color: var(--ink-2);
+  padding: 9px 10px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
+.model-select-menu button:hover { background: var(--inset); color: var(--ink); }
+.model-select-menu button.active { background: var(--brand-soft); color: var(--brand); }
+.ms-row { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.ms-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-rec { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); font-weight: 600; flex: 0 0 auto; }
+.ms-tag { margin-left: auto; font-size: 10.5px; padding: 1px 8px; border-radius: 999px; font-weight: 600; flex: 0 0 auto; }
+.ms-tag.paid { background: var(--warn-bg); color: var(--warn-ink); }
+.ms-tag.free { background: var(--ok-bg); color: var(--ok-ink); }
+.ms-check { color: var(--brand); flex: 0 0 auto; }
+.ms-placeholder { color: var(--muted); flex: 1; }
+.model-select .brand-glyph { width: 22px; height: 22px; }
 
 /* inbox rows: keep source glyph left, content flowing next to it */
 .radar-item { justify-content: flex-start; }
