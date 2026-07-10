@@ -1,5 +1,6 @@
 import { KeyRound, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { PROVIDER_META, PROVIDER_ORDER } from '../../components/model/ModelSelect'
+import BrandGlyph from '../../components/BrandGlyph'
 import StatusMessage from '../../components/status/StatusMessage'
 
 export default function ProviderSettings({
@@ -19,7 +20,7 @@ export default function ProviderSettings({
           return (
             <button key={item} className={provider === item ? 'active' : ''} aria-pressed={provider === item}
               onClick={() => { setProvider(item); setMessage(null) }}>
-              {PROVIDER_META[item].label}<span className={`provider-dot ${status?.key_set ? 'ok' : ''}`} />
+              <BrandGlyph provider={item} />{PROVIDER_META[item].label}<span className={`provider-dot ${status?.key_set ? 'ok' : ''}`} />
             </button>
           )
         })}

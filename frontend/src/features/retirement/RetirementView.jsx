@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Search, Trash2 } from 'lucide-react'
+import { CheckSquare, Search, Trash2 } from 'lucide-react'
 import { apiFetch, postJson } from '../../app/api'
 import StatusMessage from '../../components/status/StatusMessage'
+import SourceGlyph, { sourceTypeFromPath } from '../../components/SourceGlyph'
 import { deriveVaultPaths } from '../../paths'
 
 export default function RetirementView({ settings, active = true, ready = true }) {
@@ -52,67 +53,66 @@ export default function RetirementView({ settings, active = true, ready = true }
     }
   }
 
+  const allChecked = items.length > 0 && checked.length === items.length
   return (
-    <div className="retire-tab" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <p style={{ opacity: 0.75, fontSize: 13, lineHeight: 1.6 }}>
+    <div className="retire-tab">
+      <p className="retire-note">
         退場候選＝外部參考筆記過時超過設定天數、且沒有被任何系統自述筆記引用。
         系統自述（架構／原子卡／歷史節點）永不出現在這。這裡只列候選；刪除是移到
         <code> _trash</code>（可救回），需逐批二次確認，不自動刪。
       </p>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <label style={{ fontSize: 13 }}>過時窗（天）</label>
+      <div className="panel retire-control">
+        <label htmlFor="stale-days">過時窗（天）</label>
         <input
-          type="number" min="1" value={staleDays}
+          id="stale-days" type="number" min="1" value={staleDays}
           onChange={(e) => setStaleDays(Math.max(1, Number(e.target.value) || 1))}
-          style={{ width: 80 }}
+          className="retire-days"
         />
-        <button onClick={() => load(false)} disabled={busy === 'load'}>
-          <Search size={14} /> 重新掃描
+        <button className="btn primary" onClick={() => load(false)} disabled={busy === 'load'}>
+          <Search size={15} /> 重新掃描
         </button>
-        <span style={{ opacity: 0.6, fontSize: 12 }}>掃描 {scanned} 篇 ／ 候選 {items.length} 筆</span>
+        <span className="retire-scanned">掃描 {scanned} 篇 · 候選 {items.length} 筆</span>
       </div>
 
       <StatusMessage status={status} className="workbench-alert" />
 
-      {items.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={() => setChecked(checked.length === items.length ? [] : items.map((x) => x.path))}
-          >
-            {checked.length === items.length ? '取消全選' : '全選'}
-          </button>
-          <button
-            onClick={() => setConfirmAsk(true)}
-            disabled={checked.length === 0 || busy === 'delete'}
-          >
-            <Trash2 size={14} /> 刪除勾選（{checked.length}）
-          </button>
-        </div>
-      )}
-
       {confirmAsk && (
-        <div className="workbench-alert" style={{ border: '1px solid var(--accent, #b55)', padding: 10, borderRadius: 6 }}>
-          <p style={{ margin: '0 0 8px' }}>確認把勾選的 <b>{checked.length}</b> 筆移到 _trash？（可從該資料夾救回）</p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={doDelete} disabled={busy === 'delete'}>確認刪除</button>
-            <button onClick={() => setConfirmAsk(false)} disabled={busy === 'delete'}>取消</button>
+        <div className="retire-confirm">
+          <p>確認把勾選的 <b>{checked.length}</b> 筆移到 _trash？（可從該資料夾救回）</p>
+          <div className="retire-confirm-actions">
+            <button className="btn danger" onClick={doDelete} disabled={busy === 'delete'}>確認刪除</button>
+            <button className="btn" onClick={() => setConfirmAsk(false)} disabled={busy === 'delete'}>取消</button>
           </div>
         </div>
       )}
 
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {items.map((it) => (
-          <li key={it.path} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 6, background: 'var(--surface-2, rgba(0,0,0,0.03))' }}>
-            <input type="checkbox" checked={checked.includes(it.path)} onChange={() => toggleChecked(it.path)} />
-            <span style={{ minWidth: 56, opacity: 0.6, fontSize: 12, textAlign: 'right' }}>{it.age_days}d</span>
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={it.path}>{it.title}</span>
-          </li>
-        ))}
-      </ul>
+      {items.length > 0 && (
+        <section className="panel">
+          <div className="retire-batchbar">
+            <button className="btn" onClick={() => setChecked(allChecked ? [] : items.map((x) => x.path))}>
+              <CheckSquare size={15} /> {allChecked ? '取消全選' : '全選'}
+            </button>
+            <span className="retire-sel">已勾 {checked.length}</span>
+            <button className="btn danger" style={{ marginLeft: 'auto' }} onClick={() => setConfirmAsk(true)} disabled={checked.length === 0 || busy === 'delete'}>
+              <Trash2 size={15} /> 刪除勾選（{checked.length}）
+            </button>
+          </div>
+          <div className="retire-rows">
+            {items.map((it) => (
+              <label key={it.path} className="retire-row" title={it.path}>
+                <input type="checkbox" checked={checked.includes(it.path)} onChange={() => toggleChecked(it.path)} />
+                <SourceGlyph type={sourceTypeFromPath(it.path)} />
+                <span className="retire-row-title">{it.title}</span>
+                <span className="retire-age">停留 {it.age_days} 天</span>
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
 
       {ready && items.length === 0 && status?.type !== 'info' && (
-        <p style={{ opacity: 0.6, fontSize: 13 }}>目前沒有退場候選（窗 {staleDays} 天）。筆記庫還年輕時這是正常的；調小窗可預覽機制。</p>
+        <div className="cost-empty">目前沒有退場候選（窗 {staleDays} 天）。筆記庫還年輕時這是正常的；調小窗可預覽機制。</div>
       )}
     </div>
   )
