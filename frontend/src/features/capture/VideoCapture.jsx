@@ -107,7 +107,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
       const data = await postJson('/production-extractor', {
         url, mode: 'real', user_authorized_media: true, allow_provider_ocr: true, confirm_report_only: true,
       })
-      const text = (data.segments || []).map((s) => s.text).filter(Boolean).join('\n').trim()
+      const text = (data.ocr_text || '').trim()
       if (!text) throw new Error('OCR 未取得可用文字（此來源畫面可能無硬字幕）')
       setEnText(text); setLang('en')
       setStatus({ type: 'ok', message: '已用畫面 OCR 產生文字，可校正後生成草稿。' })
