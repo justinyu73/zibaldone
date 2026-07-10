@@ -292,9 +292,9 @@ export default function InboxView({ settings, active = true, onCount, onGo, read
 
       <div className="library-toolbar">
         <div className="tabs-mini" role="group" aria-label="收件匣檢視">
-          <button className={inboxView === 'notes' ? 'active' : ''} aria-pressed={inboxView === 'notes'} onClick={() => setInboxView('notes')}>待消化筆記（{items.length}）</button>
-          <button className={inboxView === 'capture' ? 'active' : ''} aria-pressed={inboxView === 'capture'} onClick={() => setInboxView('capture')}><Inbox size={14} />手機收錄（{captureItems.length}）</button>
-          <button className={inboxView === 'radar' ? 'active' : ''} aria-pressed={inboxView === 'radar'} onClick={() => setInboxView('radar')}><Radar size={14} />新聞雷達（{radarItems.length}）</button>
+          <button className={inboxView === 'notes' ? 'active' : ''} aria-pressed={inboxView === 'notes'} onClick={() => setInboxView('notes')}><FileText size={14} />待消化筆記<span className="cnt">{items.length}</span></button>
+          <button className={inboxView === 'capture' ? 'active' : ''} aria-pressed={inboxView === 'capture'} onClick={() => setInboxView('capture')}><Inbox size={14} />手機收錄<span className="cnt">{captureItems.length}</span></button>
+          <button className={inboxView === 'radar' ? 'active' : ''} aria-pressed={inboxView === 'radar'} onClick={() => setInboxView('radar')}><Radar size={14} />新聞雷達<span className="cnt">{radarItems.length}</span></button>
         </div>
         {inboxView === 'radar' && (
           <>
