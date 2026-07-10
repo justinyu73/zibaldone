@@ -185,10 +185,6 @@ class AsrModelDownloadReq(BaseModel):
     model: str = "medium"
 
 
-class OllamaPullReq(BaseModel):
-    model: str = "gemma3:4b"
-
-
 class SourceToNoteReq(BaseModel):
     url: str
     vault_path: VaultPath = ""

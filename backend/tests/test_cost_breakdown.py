@@ -21,8 +21,8 @@ class CostBreakdownTests(unittest.TestCase):
              "observed_at": f"{today}T01:00:00", "usage": {"input_tokens": 100, "output_tokens": 50}},
             {"task": "translate", "provider": "openai", "model": "gpt-5.2", "provider_call_count": 2,
              "observed_at": f"{today}T02:00:00", "usage": {"input_tokens": 200, "output_tokens": 80}},
-            # 本地 ollama model B
-            {"task": "translate", "provider": "ollama", "model": "ollama:qwen2.5:3b", "provider_call_count": 1,
+            # 本地 llama.cpp model B
+            {"task": "translate", "provider": "llamacpp", "model": "llamacpp:gemma-3-4b-it", "provider_call_count": 1,
              "observed_at": f"{today}T03:00:00", "usage": {"input_tokens": 1000, "output_tokens": 300}},
             # estimate-only (0 calls) 不計
             {"task": "summary", "provider": "openai", "model": "gpt-5.2", "provider_call_count": 0,

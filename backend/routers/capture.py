@@ -283,13 +283,13 @@ def summarize(req: SummarizeReq):
 
     summary_model = model_for_task("summary", "gpt-5.2")
     provider = providers.detect_provider(summary_model)
-    if provider != "ollama" and not app_config.get_provider_key(provider):
+    if provider not in ("cli", "llamacpp") and not app_config.get_provider_key(provider):
         raise HTTPException(400, f"{provider} API 金鑰未設定；AI 摘要已停用")
     _check_daily_cap()
 
     # 本地小模型不可靠地把英文「邊摘要邊翻譯」成繁中 → 餵已翻譯的中文（中文進中文出，較完整）；
     # 雲端維持讀英文原文（保真、不繞翻譯層），行為不變。
-    if provider == "ollama":
+    if provider == "llamacpp":
         source = req.transcript_zh.strip() or req.transcript_en.strip()
     else:
         source = req.transcript_en.strip() or req.transcript_zh.strip()
@@ -357,7 +357,7 @@ explicit_topic, key_points, terms, content_value, source_platform, content_categ
         except Exception:
             if attempt == 0:
                 continue
-            hint = "（本地小模型對長逐字稿較弱，可改用較大本地模型如 qwen2.5:14b/32b，或切回雲端摘要）" if provider == "ollama" else ""
+            hint = "（本地小模型對長逐字稿較弱，可切回雲端摘要）" if provider == "llamacpp" else ""
             raise HTTPException(502, f"{provider} 回傳的 JSON 無法解析{hint}")
     return {"summary": _normalize_summary(summary, req.source_url), "estimate": _estimate(source, req.mode)}
 

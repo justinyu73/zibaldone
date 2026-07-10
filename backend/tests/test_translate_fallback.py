@@ -1,5 +1,5 @@
 """Translate fallback chain (local-first): primary provider 失敗 → 走 config 的備援
-model（例：雲端主→本地 ollama），全鏈失敗才 raise。預設無 fallbacks＝行為不變。
+model（例：雲端主→本地 llama.cpp），全鏈失敗才 raise。預設無 fallbacks＝行為不變。
 無 provider/網路/spend：stub providers.chat_complete + model_policy。"""
 import os
 import sys
@@ -15,14 +15,14 @@ class ModelsForTaskChainTests(unittest.TestCase):
         import model_policy
         orig = model_policy.load_model_policy
         model_policy.load_model_policy = lambda: {
-            "tasks": {"translate": {"model": "gpt-x", "fallbacks": ["ollama:qwen", "gpt-x", ""]}}
+            "tasks": {"translate": {"model": "gpt-x", "fallbacks": ["llamacpp:gemma-3-4b-it", "gpt-x", ""]}}
         }
         try:
             chain = model_policy.models_for_task("translate", "fb")
         finally:
             model_policy.load_model_policy = orig
         # primary first; repeated primary + empty dropped
-        self.assertEqual(chain, ["gpt-x", "ollama:qwen"])
+        self.assertEqual(chain, ["gpt-x", "llamacpp:gemma-3-4b-it"])
 
     def test_no_fallbacks_is_single_model(self):
         import model_policy
@@ -50,14 +50,14 @@ class TranslateFallbackTests(unittest.TestCase):
         import json
         import providers
         import translator
-        translator.models_for_task = lambda task, fb="": ["gpt-primary", "ollama:qwen"]
+        translator.models_for_task = lambda task, fb="": ["gpt-primary", "llamacpp:gemma-3-4b-it"]
         orig_cc = providers.chat_complete
 
         def fake_cc(*, model, prompt, system=None, **kw):
             if model == "gpt-primary":
                 raise providers.ProviderError("primary down")
             return {"text": "本地譯", "usage": {"confidence": "not_available"},
-                    "provider": "ollama", "model": model}
+                    "provider": "llamacpp", "model": model}
 
         providers.chat_complete = fake_cc
         try:
@@ -67,7 +67,7 @@ class TranslateFallbackTests(unittest.TestCase):
         self.assertEqual(out, "本地譯")
         # usage event records the provider actually used (local fallback)
         events = [json.loads(l) for l in self.tmplog.read_text().splitlines() if l.strip()]
-        self.assertEqual([e for e in events if e["task"] == "translate"][0]["provider"], "ollama")
+        self.assertEqual([e for e in events if e["task"] == "translate"][0]["provider"], "llamacpp")
 
     def test_whole_chain_failure_raises_translateerror(self):
         import providers

@@ -250,7 +250,7 @@ def _summarize_meeting(
 
     summary_model = model_for_task("summary", "gpt-5.2")
     provider = providers.detect_provider(summary_model)
-    if provider != "ollama" and not app_config.get_provider_key(provider):
+    if provider not in ("cli", "llamacpp") and not app_config.get_provider_key(provider):
         raise HTTPException(400, f"{provider} API 金鑰未設定")
     _str = {"type": "string"}
     _strs = {"type": "array", "items": {"type": "string"}}
@@ -277,7 +277,7 @@ def _summarize_meeting(
         except Exception:
             if attempt == 0:
                 continue
-            hint = "（本地小模型對長逐字稿較弱，可改用較大本地模型或雲端摘要）" if provider == "ollama" else ""
+            hint = "（本地小模型對長逐字稿較弱，可改用雲端摘要）" if provider == "llamacpp" else ""
             raise HTTPException(502, f"{provider} 回傳的 JSON 無法解析{hint}")
 
 
@@ -534,36 +534,3 @@ def _strip_asr_hallucinations(text: str) -> str:
         if not any(h in line for h in _ASR_HALLUCINATION_SUBSTRINGS)
     ]
     return "\n".join(kept)
-
-
-# 本機 LLM（Ollama）一鍵下載：沿用 local-asr-model 的 background+poll+lock 範式（不平行造）。
-# 模型走 Ollama /api/pull 串流進度；Ollama 本體不在此代裝（精靈給安裝指引）。
-_OLLAMA_RECOMMENDED_MODEL = "gemma3:4b"
-_OLLAMA_PULLS: dict[str, dict[str, Any]] = {}
-_OLLAMA_PULL_LOCK = threading.Lock()
-
-
-def _pull_ollama_model(name: str) -> None:
-    """Stream pull progress from Ollama into _OLLAMA_PULLS for the UI to poll.
-    Ollama owns download/resume/integrity; we only relay bytes and errors."""
-    state = _OLLAMA_PULLS[name]
-    try:
-        payload = json.dumps({"model": name}).encode("utf-8")
-        request = urllib.request.Request(
-            f"http://{providers.ollama_host()}/api/pull",
-            data=payload, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(request, timeout=3600) as resp:
-            for raw in resp:
-                line = json.loads(raw.decode("utf-8"))
-                if line.get("error"):
-                    raise ValueError(line["error"])
-                # 多層 blob 各自帶 total/completed；主模型 blob 遠大於其餘 → 以最新層顯示即可
-                if line.get("total"):
-                    state["total"] = int(line["total"])
-                    state["downloaded"] = int(line.get("completed") or 0)
-        if name not in providers.ollama_tags()["models"]:
-            raise ValueError("下載結束但模型未出現在 Ollama，請重試")
-        state["status"] = "done"
-    except Exception as exc:  # noqa: BLE001 — any failure must surface to the UI, not crash the thread
-        state["status"] = "error"
-        state["error"] = str(exc)

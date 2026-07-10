@@ -79,11 +79,11 @@ cooperative cancellation at stage boundaries.
 chat_complete(model=..., prompt=..., system=..., json_mode=..., json_schema=...)
 ```
 
-The model id prefix routes it: `ollama:` (local HTTP), `llamacpp:` (built-in
-runtime), `cli:` (subscription CLI subprocess, **off by default** — terms-of-service
-gray zone, opt-in setting), or a cloud SDK (OpenAI/Anthropic/Google). Keyless
-routes skip the key check; usage is normalized so the cost page can truthfully
-report $0 for local routes.
+The model id prefix routes it: `llamacpp:` (built-in local runtime), `cli:`
+(subscription CLI subprocess, **off by default** — terms-of-service gray zone,
+opt-in setting), or a cloud SDK (OpenAI/Anthropic/Google). Keyless routes
+(`llamacpp:`, `cli:`) skip the key check; usage is normalized so the cost page can
+truthfully report $0 for local routes.
 
 Two hard rules learned the expensive way:
 
@@ -96,18 +96,19 @@ Two hard rules learned the expensive way:
   a model that returns real segment timestamps after the cheaper default was
   caught fabricating `[00:00]` anchors.
 
-The **built-in runtime** (spec C) exists because "install Ollama first" is still
-friction: a pinned llama.cpp release (~15 MB) plus a quantized model (~2.4 GB) are
-downloaded on first use with `.part` + atomic-rename semantics — a half-download
-never looks installed. Neither ships in the installer; the release budget
-(warn 95 MB / fail 110 MB) is CI-enforced.
+The **built-in runtime** (spec C) is the keyless local path: a pinned llama.cpp
+release (~15 MB) plus a quantized `gemma-3-4b-it` model (~2.4 GB) are downloaded on
+first use with `.part` + atomic-rename semantics — a half-download never looks
+installed. Neither ships in the installer (which keeps the release budget — warn
+95 MB / fail 110 MB — CI-enforced); once installed, `llamacpp:gemma-3-4b-it` is the
+default `translate` model, with cloud as the configured fallback.
 
 ## Testing as architecture
 
-- **Surface contract**: all 77 endpoint method/path pairs are pinned in one test.
+- **Surface contract**: all 76 endpoint method/path pairs are pinned in one test.
   Router refactors (this codebase was split from a 3,700-line `main.py` in six
   verbatim-move batches) can't silently change the API.
-- **Layers**: 340+ backend unit tests (no network, providers mocked), 47 frontend
+- **Layers**: 320+ backend unit tests (no network, providers mocked), 47 frontend
   unit tests, 21 Playwright E2E cases against a real spawned backend, Rust
   lifecycle tests, plus a product-readiness check (tracked-tree size, forbidden
   paths, artifact budget) that runs in CI and at release.

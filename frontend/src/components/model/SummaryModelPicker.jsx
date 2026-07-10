@@ -28,7 +28,7 @@ export default function SummaryModelPicker({ transcriptionRoute = 'local', evide
     try { await postJson('/app/settings', { summary_model: v }) } catch { /* 設定頁仍可改 */ }
   }
   const provider = providerForModel(model, opts?.summary || [])
-  const summaryLocal = provider === 'ollama'
+  const summaryLocal = provider === 'llamacpp'
   const transcriptLabel = evidenceLabel || (transcriptionRoute === 'provided'
     ? '轉錄：已提供・免費'
     : transcriptionRoute === 'cloud' ? '轉錄：雲端・付費' : '轉錄：本機・免費')

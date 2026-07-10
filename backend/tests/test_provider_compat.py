@@ -74,7 +74,7 @@ class TranslateProviderCompatTests(unittest.TestCase):
         os.environ["OPENAI_API_KEY"] = "test-key-not-real"
         _redirect_usage_log()
         import translator
-        os.environ["OPENAI_TRANSLATE_MODEL"] = "gpt-5-mini"  # pin：不受本機 ambient 設定（如 ollama）影響
+        os.environ["OPENAI_TRANSLATE_MODEL"] = "gpt-5-mini"  # pin：不受本機 ambient 設定影響
         calls = _patch_openai("翻譯結果")
         out = translator.translate_to_zh("hello world", "zh-TW")
         self.assertEqual(out, "翻譯結果")
@@ -91,7 +91,7 @@ class SummarizeProviderCompatTests(unittest.TestCase):
         _redirect_usage_log()
         import main  # noqa: F401 — bootstrap side effects（dotenv/apply_settings_to_env）順序不變
         import routers.capture as capture
-        os.environ["OPENAI_SUMMARY_MODEL"] = "gpt-5.2"  # pin（在 apply_settings_to_env 後，免被本機 ollama 設定蓋掉）
+        os.environ["OPENAI_SUMMARY_MODEL"] = "gpt-5.2"  # pin（在 apply_settings_to_env 後，免被本機 ambient 設定蓋掉）
         calls = _patch_openai(
             '{"explicit_topic":"t","key_points":["a"],"terms":["x"],'
             '"content_value":"v","source_platform":"YT","content_category":"AI"}'

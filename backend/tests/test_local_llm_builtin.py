@@ -110,24 +110,19 @@ class ChatTests(unittest.TestCase):
 
 
 class OptionsMergeTests(unittest.TestCase):
-    def test_ollama_running_hides_builtin(self):
-        with mock.patch.object(providers, "ollama_tags",
-                               return_value={"running": True, "models": ["gemma3:4b"]}), \
-             mock.patch.object(providers, "cli_options", return_value=[]), \
-             mock.patch.object(B, "status", return_value={"ready": True}):
-            out = S.model_options()
-        self.assertNotIn("llamacpp", out["providers"])
-        self.assertIn("ollama", out["providers"])
-
-    def test_builtin_appears_without_ollama(self):
-        with mock.patch.object(providers, "ollama_tags",
-                               return_value={"running": False, "models": []}), \
-             mock.patch.object(providers, "cli_options", return_value=[]), \
+    def test_builtin_appears_when_ready(self):
+        with mock.patch.object(providers, "cli_options", return_value=[]), \
              mock.patch.object(B, "status", return_value={"ready": True}):
             out = S.model_options()
         self.assertIn("llamacpp", out["providers"])
         ids = [o["id"] for o in out["summary"]]
         self.assertIn(B.MODEL_ID, ids)
+
+    def test_builtin_absent_when_not_ready(self):
+        with mock.patch.object(providers, "cli_options", return_value=[]), \
+             mock.patch.object(B, "status", return_value={"ready": False}):
+            out = S.model_options()
+        self.assertNotIn("llamacpp", out["providers"])
 
 
 if __name__ == "__main__":

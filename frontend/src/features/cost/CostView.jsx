@@ -33,7 +33,7 @@ export function brandKey(brand) {
   if (b.includes('claude') || b.includes('anthropic')) return 'claude'
   if (b.includes('openai') || b.includes('gpt')) return 'openai'
   if (b.includes('gemini') || b.includes('google')) return 'gemini'
-  if (b.includes('ollama') || b.includes('llama') || b.includes('qwen')) return 'ollama'
+  if (b.includes('本機') || b.includes('llama') || b.includes('local')) return 'local'
   return 'generic'
 }
 
@@ -49,7 +49,7 @@ function BrandGlyph({ brand }) {
         <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">{paths[key]}</svg>
       ) : key === 'openai' ? (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><circle cx="12" cy="12" r="5" /></svg>
-      ) : key === 'ollama' ? (
+      ) : key === 'local' ? (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13"><rect x="5" y="9" width="14" height="10" rx="2" /></svg>
       ) : (
         <Coins size={13} />
@@ -293,7 +293,7 @@ export default function CostView({ active }) {
         <div>
           <div className="command-kicker">成本監控</div>
           <h2 className="cost-title">模型火力與花費</h2>
-          <p className="cost-desc">依品牌與模型列出 token 用量和花費；本機 Ollama 零成本。</p>
+          <p className="cost-desc">依品牌與模型列出 token 用量和花費；本機 AI 零成本。</p>
         </div>
         <div className="cost-head-tools">
           <div className="tabs-mini cost-range-tabs" role="group" aria-label="成本區間">

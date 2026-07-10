@@ -1118,7 +1118,7 @@ button.primary.gated-action:not(:disabled) { box-shadow: 0 0 0 1px rgba(217, 130
 .cg-claude { background: color-mix(in srgb, #d97757 18%, transparent); color: #d97757; }
 .cg-openai { background: color-mix(in srgb, #10a37f 18%, transparent); color: #10a37f; }
 .cg-gemini { background: color-mix(in srgb, #4574f0 18%, transparent); color: #4574f0; }
-.cg-ollama { background: color-mix(in srgb, #2f9e6f 18%, transparent); color: #2f9e6f; }
+.cg-local { background: color-mix(in srgb, #2f9e6f 18%, transparent); color: #2f9e6f; }
 .cg-generic { background: var(--brand-soft); color: var(--brand); }
 
 .cost-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 18px 0 4px; }
@@ -1154,7 +1154,7 @@ button.primary.gated-action:not(:disabled) { box-shadow: 0 0 0 1px rgba(217, 130
 .cost-bar-name { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
 .cost-track { height: 12px; border-radius: 6px; background: var(--inset); overflow: hidden; }
 .cost-fill { display: block; height: 100%; border-radius: 6px; background: var(--brand); }
-.cf-claude { background: #d97757; } .cf-openai { background: #10a37f; } .cf-gemini { background: #4574f0; } .cf-ollama { background: #2f9e6f; }
+.cf-claude { background: #d97757; } .cf-openai { background: #10a37f; } .cf-gemini { background: #4574f0; } .cf-local { background: #2f9e6f; }
 .cost-bar-amt { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--ink-2); text-align: right; min-width: 80px; }
 .cost-donut-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
 .cost-donut-wrap .cost-chart-title { align-self: flex-start; }
@@ -1224,7 +1224,7 @@ button.primary.gated-action:not(:disabled) { box-shadow: 0 0 0 1px rgba(217, 130
 .bg-claude { background: color-mix(in srgb, #d97757 18%, transparent); color: #d97757; }
 .bg-openai { background: color-mix(in srgb, #10a37f 18%, transparent); color: #10a37f; }
 .bg-gemini { background: color-mix(in srgb, #4574f0 18%, transparent); color: #4574f0; }
-.bg-ollama { background: color-mix(in srgb, #2f9e6f 18%, transparent); color: #2f9e6f; }
+.bg-local { background: color-mix(in srgb, #2f9e6f 18%, transparent); color: #2f9e6f; }
 .bg-generic { background: var(--brand-soft); color: var(--brand); }
 .bg-cli { background: color-mix(in srgb, #6366f1 18%, transparent); color: #6366f1; }
 .provider-tabs button { display: inline-flex; align-items: center; gap: 7px; }

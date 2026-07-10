@@ -1,4 +1,4 @@
-"""Meeting note/ASR job and local model (whisper.cpp / Ollama / llama.cpp) routes."""
+"""Meeting note/ASR job and local model (whisper.cpp / built-in llama.cpp) routes."""
 from __future__ import annotations
 
 import threading
@@ -7,7 +7,6 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-import providers
 from meeting_note import (
     MEETINGS_SUBFOLDER,
     normalize_meeting_summary,
@@ -21,7 +20,6 @@ from schemas import (
     ImportTranscriptReq,
     MeetingDraftSaveReq,
     MeetingNoteReq,
-    OllamaPullReq,
 )
 from services.library import _settings
 from services.meetings import (
@@ -29,9 +27,6 @@ from services.meetings import (
     _ASR_MODEL_DOWNLOADS,
     _ASR_MODEL_REGISTRY,
     _MEETING_JOBS,
-    _OLLAMA_PULL_LOCK,
-    _OLLAMA_PULLS,
-    _OLLAMA_RECOMMENDED_MODEL,
     _asr_model_installed,
     _download_asr_model,
     _load_job_state,
@@ -39,7 +34,6 @@ from services.meetings import (
     _meeting_asr_fn_for,
     _persist_job_state,
     _persist_meeting_draft,
-    _pull_ollama_model,
     _spawn_meeting_job,
     _summarize_meeting,
     _timestamped_transcript,
@@ -229,20 +223,10 @@ def app_local_asr_model_download(req: AsrModelDownloadReq):
 
 @router.get("/api/app/local-llm/status")
 def app_local_llm_status():
+    # 本機免金鑰 AI = 內建 llama.cpp runtime（spec C）；狀態含就緒與首用下載進度。
     import local_llm_builtin
 
-    tags = providers.ollama_tags()
-    out: dict[str, Any] = {
-        "running": tags["running"],
-        "models": tags["models"],
-        "recommended": _OLLAMA_RECOMMENDED_MODEL,
-        "recommended_installed": _OLLAMA_RECOMMENDED_MODEL in tags["models"],
-        "builtin": local_llm_builtin.status(),
-    }
-    progress = _OLLAMA_PULLS.get(_OLLAMA_RECOMMENDED_MODEL)
-    if progress:
-        out["pull"] = {k: progress.get(k) for k in ("status", "downloaded", "total", "error")}
-    return out
+    return {"builtin": local_llm_builtin.status()}
 
 
 @router.post("/api/app/local-llm/builtin/install")
@@ -254,20 +238,3 @@ def app_local_llm_builtin_install():
         return local_llm_builtin.start_install()
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
-
-
-@router.post("/api/app/local-llm/pull")
-def app_local_llm_pull(req: OllamaPullReq):
-    name = req.model
-    tags = providers.ollama_tags()
-    if not tags["running"]:
-        raise HTTPException(400, "Ollama 未啟動——請先安裝並啟動 Ollama（ollama.com）再重新偵測")
-    if name in tags["models"]:
-        return {"ok": True, "status": "done", "already_installed": True}
-    with _OLLAMA_PULL_LOCK:
-        current = _OLLAMA_PULLS.get(name)
-        if current and current.get("status") == "downloading":
-            return {"ok": True, "status": "downloading", **{k: current.get(k) for k in ("downloaded", "total")}}
-        _OLLAMA_PULLS[name] = {"status": "downloading", "downloaded": 0, "total": 0, "error": ""}
-    threading.Thread(target=_pull_ollama_model, args=(name,), daemon=True).start()
-    return {"ok": True, "status": "downloading"}
