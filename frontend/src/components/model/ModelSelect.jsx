@@ -37,14 +37,15 @@ export function costTag(provider) {
   return '付費'
 }
 
-function ModelRow({ option, compact }) {
+function ModelRow({ option, compact, toggle = false }) {
   const provider = option.provider || providerForModel(option.id)
   const name = compact ? option.id : (option.label || option.id)
   return (
     <span className="ms-row">
       <BrandGlyph provider={provider} />
       <span className="ms-name">{name}</span>
-      {option.recommended && <span className="ms-rec">推薦</span>}
+      {/* 收合鈕在窄欄位省略「推薦」小標，優先讓模型名可讀，避免版位超出 */}
+      {!toggle && option.recommended && <span className="ms-rec">推薦</span>}
       <span className={`ms-tag ${provider === 'ollama' || provider === 'cli' ? 'free' : 'paid'}`}>{costTag(provider)}</span>
     </span>
   )
@@ -72,7 +73,7 @@ export default function ModelSelect({ value, onChange, options, compact = false 
     <div className={`model-select ${compact ? 'compact' : ''}`} onClick={(e) => e.stopPropagation()}>
       <button type="button" className="model-select-toggle" aria-haspopup="listbox" aria-expanded={open}
         disabled={list.length === 0} onClick={() => setOpen((v) => !v)}>
-        {current ? <ModelRow option={current} compact={compact} /> : <span className="ms-placeholder">{list.length ? '選擇模型' : '載入中…'}</span>}
+        {current ? <ModelRow option={current} compact={compact} toggle /> : <span className="ms-placeholder">{list.length ? '選擇模型' : '載入中…'}</span>}
         <ChevronDown size={15} className="ms-caret" />
       </button>
       {open && (

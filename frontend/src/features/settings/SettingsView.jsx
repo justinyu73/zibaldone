@@ -55,9 +55,12 @@ export default function SettingsView({ settings, setSettings, onOpenSetup }) {
         daily_cap_usd: Number(rt.daily_cap_usd),
         meeting_template: rt.meeting_template || 'general',
         meeting_glossary: Array.isArray(rt.meeting_glossary) ? rt.meeting_glossary : [],
+        cli_providers_enabled: Boolean(rt.cli_providers_enabled),
       }
       const d = await (await apiFetch(`/app/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()
       setRt(d); setRtSaved(true); refreshCost()
+      // 開/關 CLI 訂閱模型會改變可選模型清單（providers.py：關著一律空），存檔後重抓
+      apiFetch(`/app/model-options`).then((r) => r.json()).then(setModelOpts).catch(() => {})
     } catch { /* ignore */ }
   }
 
