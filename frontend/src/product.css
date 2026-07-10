@@ -1229,7 +1229,7 @@ button.primary.gated-action:not(:disabled) { box-shadow: 0 0 0 1px rgba(217, 130
 /* ==== model select (custom dropdown: LOGO + short label) ==== */
 .model-select { position: relative; }
 .model-select-toggle { width: 100%; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1.5px solid var(--line-strong);
-  border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
+  border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; font-size: 13px; text-align: left; overflow: hidden; }
 .model-select-toggle:hover { border-color: var(--brand); }
 .model-select-toggle:disabled { opacity: .6; cursor: default; }
 .model-select-toggle:focus-visible { outline: 0; box-shadow: var(--ring); border-color: var(--brand); }
@@ -1241,7 +1241,7 @@ button.primary.gated-action:not(:disabled) { box-shadow: 0 0 0 1px rgba(217, 130
 .model-select-menu button:hover { background: var(--inset); color: var(--ink); }
 .model-select-menu button.active { background: var(--brand-soft); color: var(--brand); }
 .ms-row { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-.ms-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ms-rec { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); font-weight: 600; flex: 0 0 auto; }
 .ms-tag { margin-left: auto; font-size: 10.5px; padding: 1px 8px; border-radius: 999px; font-weight: 600; flex: 0 0 auto; }
 .ms-tag.paid { background: var(--warn-bg); color: var(--warn-ink); }
