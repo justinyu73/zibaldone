@@ -64,8 +64,10 @@ function CurrencyPicker({ currency, onChange }) {
   useEffect(() => {
     if (!open) return undefined
     const close = () => setOpen(false)
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
     window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('click', close); window.removeEventListener('keydown', onKey) }
   }, [open])
   return (
     <div className="cost-cur" onClick={(e) => e.stopPropagation()}>
