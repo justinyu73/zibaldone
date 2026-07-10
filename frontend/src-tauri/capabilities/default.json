@@ -16,12 +16,6 @@
           "cmd": "video-intake-fastapi-sidecar-dev",
           "sidecar": true,
           "args": []
-        },
-        {
-          "name": "binaries/video-intake-fastapi-sidecar",
-          "cmd": "video-intake-fastapi-sidecar",
-          "sidecar": true,
-          "args": []
         }
       ]
     },

@@ -34,8 +34,7 @@
     "shortDescription": "本機優先的影片、文章與會議筆記收錄工具",
     "longDescription": "將使用者授權的影片字幕、文章與會議音檔整理成可校正、可搜尋的 Markdown 筆記。",
     "externalBin": [
-      "binaries/video-intake-fastapi-sidecar-dev",
-      "binaries/video-intake-fastapi-sidecar"
+      "binaries/video-intake-fastapi-sidecar-dev"
     ],
     "windows": {
       "allowDowngrades": false,

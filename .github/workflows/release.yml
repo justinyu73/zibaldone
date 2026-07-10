@@ -53,11 +53,14 @@ jobs:
         env:
           TAURI_CONFIG: '{"bundle":{"externalBin":[]}}'
       - run: pip install -r backend/requirements.txt pyinstaller
-      - name: build sidecar (PyInstaller, per-OS)
+      - name: build sidecar (PyInstaller --onedir, per-OS)
         shell: bash
+        # --onedir (not --onefile): ship the exe + _internal/ tree so each launch
+        # skips the onefile bootloader's ~200MB self-extraction into a temp dir.
+        # That extraction was the dominant sidecar cold-start cost.
         run: |
           cd backend
-          pyinstaller --onefile --name video-intake-fastapi-sidecar \
+          pyinstaller --onedir --name video-intake-fastapi-sidecar \
             --add-data "enabled_models.json${{ matrix.sep }}." \
             --collect-submodules uvicorn --collect-submodules anyio \
             --collect-data trafilatura --collect-data justext --collect-data tld --collect-data certifi \
@@ -67,17 +70,19 @@ jobs:
             --hidden-import uvicorn.protocols.http.auto \
             --hidden-import uvicorn.protocols.websockets.auto --hidden-import uvicorn.lifespan.on \
             sidecar_main.py
-          TRIPLE="$(rustc -vV | sed -n 's/host: //p')"
+          # onedir is a folder (exe + _internal/); bundle it whole as a Tauri
+          # resource. No target-triple suffix needed — resources are referenced by
+          # relative path, not resolved per host triple like externalBin.
+          rm -rf ../frontend/src-tauri/binaries/video-intake-fastapi-sidecar
           mkdir -p ../frontend/src-tauri/binaries
-          # 只放 production sidecar：dev sidecar 僅 `tauri dev` 用、probe 已退役（從沒被叫）。
-          # 之前複製成 3 份同 binary＝包大小 246MB；release 只需 1 份。
-          cp "dist/video-intake-fastapi-sidecar${{ matrix.ext }}" \
-             "../frontend/src-tauri/binaries/video-intake-fastapi-sidecar-${TRIPLE}${{ matrix.ext }}"
+          cp -R dist/video-intake-fastapi-sidecar \
+             ../frontend/src-tauri/binaries/video-intake-fastapi-sidecar
       - run: npm ci
         working-directory: frontend
       - name: tauri build (signed)
-        # release 只包 production sidecar（覆寫 externalBin，移除 dev sidecar）＝包大小 246→~86MB。
-        run: npx tauri build --bundles ${{ matrix.bundles }} --config '{"bundle":{"externalBin":["binaries/video-intake-fastapi-sidecar"]}}'
+        # Release override: drop the dev externalBin and bundle the onedir tree as a
+        # resource under Resources/sidecar/ (matches SIDECAR_RESOURCE_DIR in lib.rs).
+        run: npx tauri build --bundles ${{ matrix.bundles }} --config '{"bundle":{"externalBin":[],"resources":{"binaries/video-intake-fastapi-sidecar":"sidecar"}}}'
         working-directory: frontend
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

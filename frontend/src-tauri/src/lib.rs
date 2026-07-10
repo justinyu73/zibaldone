@@ -3,19 +3,36 @@ use std::sync::{Arc, Mutex};
 
 use rand::{distributions::Alphanumeric, Rng};
 use tauri::Manager;
+#[cfg(debug_assertions)]
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
+#[cfg(debug_assertions)]
 use tauri_plugin_shell::ShellExt;
 
-// Dev uses the source-backed shell script (no rebuild needed); release ships the
-// PyInstaller standalone binary (no Python/source/venv dependency, block #8b).
+// Dev uses the source-backed shell sidecar via externalBin (no rebuild needed).
+// Release ships the PyInstaller --onedir tree (exe + _internal/) as a Tauri
+// resource and spawns the inner exe directly: onedir skips the per-launch onefile
+// self-extraction, so the sidecar reaches ready in a fraction of the time.
 const SIDECAR_NAME: &str = if cfg!(debug_assertions) {
     "video-intake-fastapi-sidecar-dev"
 } else {
     "video-intake-fastapi-sidecar"
 };
 
+// Release: subdir under resource_dir() that holds the onedir tree. Must match the
+// bundle.resources target in tauri.conf.json.
+#[cfg(not(debug_assertions))]
+const SIDECAR_RESOURCE_DIR: &str = "sidecar";
+
 // Must match backend/sidecar_main.py VIDEO_INTAKE_FASTAPI_PORT default.
 const SIDECAR_PORT: u16 = 8766;
+
+// Dev holds the shell plugin's CommandChild; release holds the std::process child
+// of the directly-spawned onedir exe. Reaping is by recorded PID either way, so the
+// handle only serves precise kill of our own child (exit / pre-update).
+#[cfg(debug_assertions)]
+type SidecarChild = CommandChild;
+#[cfg(not(debug_assertions))]
+type SidecarChild = std::process::Child;
 
 /// Tracks whether the bundled FastAPI sidecar has reported readiness.
 #[derive(Default)]
@@ -24,7 +41,7 @@ struct SidecarState {
 }
 
 /// Keeps the spawned sidecar child alive for the app lifetime.
-struct SidecarProcess(#[allow(dead_code)] Mutex<Option<CommandChild>>);
+struct SidecarProcess(#[allow(dead_code)] Mutex<Option<SidecarChild>>);
 
 /// Per-launch bearer token shared only between the Tauri webview and sidecar.
 struct SidecarSession {
@@ -177,13 +194,50 @@ fn reap_previous_sidecar(app: &tauri::AppHandle) {
     }
 }
 
+/// Kill an owned child handle. Dev's CommandChild::kill consumes self; release's
+/// std::process child needs &mut plus a wait() so it doesn't linger as a zombie
+/// before a respawn.
+#[cfg(debug_assertions)]
+fn kill_child(child: SidecarChild) {
+    let _ = child.kill();
+}
+#[cfg(not(debug_assertions))]
+fn kill_child(mut child: SidecarChild) {
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// Record our own pid and stash the child so exit / pre-update can kill precisely.
+/// First spawn → manage; respawn (update-failure recovery) → the type is already
+/// managed and manage() won't overwrite, so slot the new child into the Mutex.
+fn store_sidecar_child(app: &tauri::AppHandle, pid: u32, child: SidecarChild) {
+    record_sidecar_pid(app, pid);
+    if let Some(process) = app.try_state::<SidecarProcess>() {
+        if let Ok(mut guard) = process.0.lock() {
+            *guard = Some(child);
+        }
+    } else {
+        app.manage(SidecarProcess(Mutex::new(Some(child))));
+    }
+}
+
+/// Readiness + log forwarding, shared by the dev async event loop and the release
+/// stdout reader thread. Uvicorn prints these on both stdout and stderr depending
+/// on config; either marks the backend ready.
+fn note_sidecar_line(state: &SidecarState, line: &str) {
+    if line.contains("Application startup complete") || line.contains("Uvicorn running") {
+        state.ready.store(true, Ordering::Relaxed);
+    }
+    log::info!("[sidecar] {}", line.trim_end());
+}
+
 /// Kill the sidecar we currently manage (used before an in-app update so the
 /// installer can overwrite the locked binary). Precise by construction — it is
 /// our own child handle, not a port/name sweep.
 fn kill_current_sidecar(app: &tauri::AppHandle) {
     if let Some(process) = app.try_state::<SidecarProcess>() {
         if let Some(child) = process.0.lock().ok().and_then(|mut g| g.take()) {
-            let _ = child.kill();
+            kill_child(child);
         }
     }
     clear_sidecar_pid(app);
@@ -209,6 +263,9 @@ fn recover_on_error<T, E>(result: Result<T, E>, recover: impl FnOnce()) -> Resul
     result
 }
 
+/// Dev: spawn the source-backed shell sidecar via the shell plugin's externalBin
+/// resolution, forwarding its event stream to the shared readiness/log helper.
+#[cfg(debug_assertions)]
 fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<SidecarSession>) {
     reap_previous_sidecar(app);
     let command = match app.shell().sidecar(SIDECAR_NAME) {
@@ -226,26 +283,13 @@ fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<
             return;
         }
     };
-    record_sidecar_pid(app, child.pid());
-    // 首次 spawn → manage；respawn（update 失敗恢復）→ 該型別已 managed、manage 不覆寫，
-    // 故塞進既有 SidecarProcess 的 Mutex，確保退出時 handle 仍能精準 kill 新 child。
-    if let Some(process) = app.try_state::<SidecarProcess>() {
-        if let Ok(mut guard) = process.0.lock() {
-            *guard = Some(child);
-        }
-    } else {
-        app.manage(SidecarProcess(Mutex::new(Some(child))));
-    }
+    store_sidecar_child(app, child.pid(), child);
 
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(bytes) | CommandEvent::Stderr(bytes) => {
-                    let line = String::from_utf8_lossy(&bytes);
-                    if line.contains("Application startup complete") || line.contains("Uvicorn running") {
-                        state.ready.store(true, Ordering::Relaxed);
-                    }
-                    log::info!("[sidecar] {}", line.trim_end());
+                    note_sidecar_line(&state, &String::from_utf8_lossy(&bytes));
                 }
                 CommandEvent::Terminated(payload) => {
                     state.ready.store(false, Ordering::Relaxed);
@@ -256,6 +300,77 @@ fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<
             }
         }
     });
+}
+
+/// Release: locate the onedir tree under resource_dir() and return the inner exe.
+/// The exe and its _internal/ sibling must keep their relative layout, which the
+/// bundle.resources copy preserves.
+#[cfg(not(debug_assertions))]
+fn resolve_sidecar_exe(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    let base = app.path().resource_dir().ok()?.join(SIDECAR_RESOURCE_DIR);
+    let exe_name = format!("{SIDECAR_NAME}{}", std::env::consts::EXE_SUFFIX);
+    // Tauri's dir-resource copy has historically either flattened the contents into
+    // the target dir or nested them under the source folder name; accept both so a
+    // bundler-version change can't silently break the spawn.
+    for candidate in [base.join(&exe_name), base.join(SIDECAR_NAME).join(&exe_name)] {
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    log::error!("[sidecar] onedir exe not found under {base:?}");
+    None
+}
+
+/// Release: directly spawn the onedir exe (no per-launch self-extraction), piping
+/// its output into reader threads that drive readiness + log forwarding. Spawning
+/// via std::process is intentional — like open_log_dir, it is not gated by the
+/// shell capability scope, which cannot statically express a per-machine resource
+/// path. Reaping stays precise: it uses the recorded pid, name-verified.
+#[cfg(not(debug_assertions))]
+fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<SidecarSession>) {
+    use std::io::{BufRead, BufReader};
+    use std::process::{Command, Stdio};
+
+    reap_previous_sidecar(app);
+    let Some(exe) = resolve_sidecar_exe(app) else {
+        return;
+    };
+    let mut child = match Command::new(&exe)
+        .env("YT_NOTE_APP_SESSION_TOKEN", session.token.clone())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(err) => {
+            log::error!("[sidecar] failed to spawn {exe:?}: {err}");
+            return;
+        }
+    };
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    store_sidecar_child(app, child.id(), child);
+
+    // Uvicorn's readiness lines can land on either stream. stdout EOF marks the
+    // process gone (mirrors the dev Terminated event); stderr just forwards.
+    if let Some(out) = stdout {
+        let state = state.clone();
+        std::thread::spawn(move || {
+            for line in BufReader::new(out).lines().map_while(Result::ok) {
+                note_sidecar_line(&state, &line);
+            }
+            state.ready.store(false, Ordering::Relaxed);
+            log::warn!("[sidecar] stdout closed (terminated)");
+        });
+    }
+    if let Some(err) = stderr {
+        let state = state.clone();
+        std::thread::spawn(move || {
+            for line in BufReader::new(err).lines().map_while(Result::ok) {
+                note_sidecar_line(&state, &line);
+            }
+        });
+    }
 }
 
 
@@ -366,7 +481,7 @@ pub fn run() {
       if let tauri::RunEvent::Exit = event {
         if let Some(process) = app_handle.try_state::<SidecarProcess>() {
           if let Some(child) = process.0.lock().ok().and_then(|mut guard| guard.take()) {
-            let _ = child.kill();
+            kill_child(child);
           }
         }
         clear_sidecar_pid(app_handle);
