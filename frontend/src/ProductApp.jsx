@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Clapperboard, Coins, Inbox, Library, Settings, Trash2 } from 'lucide-react'
 import { vaultRootFromNotesFolder } from './paths'
+import ZibaldoneMark from './components/ZibaldoneMark'
 import FirstRunWizard from './FirstRunWizard'
 import { apiFetch } from './app/api'
 import CostView from './features/cost/CostView'
@@ -107,7 +108,7 @@ export default function ProductApp() {
       )}
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">V</div>
+          <ZibaldoneMark className="brand-mark" />
           <span>知識筆記</span>
         </div>
         <nav className="side-nav" aria-label="主要功能">

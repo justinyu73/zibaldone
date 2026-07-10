@@ -84,10 +84,8 @@ body {
 }
 .brand { display: flex; align-items: center; gap: 12px; padding: 8px 8px 20px; color: #fff; font-weight: 700; font-size: 15px; }
 .brand-mark {
-  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
-  background: #0f766e;
-  display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 16px;
-  box-shadow: 0 4px 10px rgba(15, 118, 110, 0.34);
+  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+  display: block; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28);
 }
 .side-nav { display: flex; flex-direction: column; gap: 4px; }
 .side-nav button {
