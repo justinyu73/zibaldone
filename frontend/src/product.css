@@ -940,6 +940,9 @@ button.primary.gated-action:not(:disabled) { box-shadow: 0 0 0 1px rgba(217, 130
 .voice-command .voice-input input { flex: 1 1 100%; min-width: 0; }
 /* 摘要模型 picker + 主按鈕自成一列、右對齊（不與 input/次按鈕擠成 ragged 換行）*/
 .voice-command .voice-input .panel-actions { flex: 1 1 100%; }
+/* 下拉選單會延伸到下一列的 inspector 範圍；提升整個 command bar 的 stacking
+   context，避免 inspector（sticky + backdrop-filter）蓋住選項。 */
+.voice-command:has(.model-select.open) { position: relative; z-index: 10; }
 /* GLUE：匯入逐字稿輸入——textarea 滿寬可貼，file-pick(label)補成 button 樣式 */
 .voice-command .transcript-input textarea {
   flex: 1 1 100%; min-height: 92px; resize: vertical; font: inherit; line-height: 1.5;

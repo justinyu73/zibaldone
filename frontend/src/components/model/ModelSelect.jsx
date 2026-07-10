@@ -70,7 +70,7 @@ export default function ModelSelect({ value, onChange, options, compact = false 
   function pick(id) { onChange?.({ target: { value: id } }); setOpen(false) }
 
   return (
-    <div className={`model-select ${compact ? 'compact' : ''}`} onClick={(e) => e.stopPropagation()}>
+    <div className={`model-select ${compact ? 'compact' : ''}${open ? ' open' : ''}`} onClick={(e) => e.stopPropagation()}>
       <button type="button" className="model-select-toggle" aria-haspopup="listbox" aria-expanded={open}
         disabled={list.length === 0} onClick={() => setOpen((v) => !v)}>
         {current ? <ModelRow option={current} compact={compact} toggle /> : <span className="ms-placeholder">{list.length ? '選擇模型' : '載入中…'}</span>}

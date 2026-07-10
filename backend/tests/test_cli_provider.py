@@ -44,6 +44,18 @@ class CliOptionsTests(unittest.TestCase):
         self.assertEqual(options[0]["provider"], "cli")
         self.assertIn("訂閱", options[0]["label"])
 
+    def test_gemini_appears_when_installed_from_pnpm_global_bin(self):
+        def is_gemini_pnpm(path):
+            return path.endswith("/Library/pnpm/gemini")
+
+        with mock.patch.object(providers.shutil, "which", return_value=None), \
+             mock.patch.object(providers.os.path, "isfile", side_effect=is_gemini_pnpm), \
+             mock.patch.object(providers.os, "access", side_effect=lambda path, mode: is_gemini_pnpm(path)):
+            options = providers.cli_options()
+
+        self.assertEqual([option["id"] for option in options], ["cli:gemini"])
+        self.assertEqual(options[0]["label"], "Gemini（訂閱）")
+
     def test_none_installed_yields_empty(self):
         with mock.patch.object(providers, "_cli_path", return_value=None):
             self.assertEqual(providers.cli_options(), [])

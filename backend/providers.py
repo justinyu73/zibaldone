@@ -36,7 +36,12 @@ _CLI_TIMEOUT_SECONDS = 300
 
 # GUI app（Tauri→sidecar）的 PATH 極簡（macOS LaunchServices 不帶 shell PATH），
 # which 找不到 nvm/npm/homebrew 裝的 CLI → 追掃常見安裝位置，回絕對路徑。
-_CLI_EXTRA_DIRS = ("~/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "~/.npm-global/bin")
+_CLI_EXTRA_DIRS = (
+    "~/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "~/.npm-global/bin",
+    # pnpm 的 macOS 預設全域 bin。Gemini CLI 常由 pnpm 安裝；Tauri 從
+    # LaunchServices 啟動時沒有 shell PATH，需和 nvm/npm fallback 一樣主動掃描。
+    "~/Library/pnpm",
+)
 
 
 def _cli_path(name: str) -> str | None:

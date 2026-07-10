@@ -73,3 +73,24 @@ test('summary model dropdown shows per-model cost tag (付費/免費)', async ({
     page.locator('.voice-workbench .summary-model-pick .model-select-menu [role="option"]').allTextContents()
   ).toEqual(expect.arrayContaining([expect.stringMatching(/付費|免費|零成本/)]))
 })
+
+test('meeting summary dropdown stays above the inspector', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1100 })
+  await openApp(page, fixture)
+  await page.click('nav.side-nav button[aria-label="收錄"]')
+  await page.getByRole('button', { name: '會議筆記音檔' }).click()
+  await page.locator('.voice-workbench .summary-model-pick .model-select-toggle').click()
+
+  const menu = page.locator('.voice-workbench .summary-model-pick .model-select-menu')
+  await expect(menu.getByRole('option', { name: /gpt-5\.2.*付費/ })).toBeVisible()
+  const [menuBox, inspectorBox] = await Promise.all([menu.boundingBox(), page.locator('.voice-workbench .inspector').boundingBox()])
+  expect(menuBox).not.toBeNull()
+  expect(inspectorBox).not.toBeNull()
+  const x = Math.max(menuBox.x, inspectorBox.x) + 8
+  const y = Math.max(menuBox.y, inspectorBox.y) + 8
+  expect(x).toBeLessThan(Math.min(menuBox.x + menuBox.width, inspectorBox.x + inspectorBox.width))
+  expect(y).toBeLessThan(Math.min(menuBox.y + menuBox.height, inspectorBox.y + inspectorBox.height))
+  await expect.poll(() => page.evaluate(({ x, y }) =>
+    Boolean(document.elementFromPoint(x, y)?.closest('.model-select-menu')), { x, y }
+  )).toBe(true)
+})
