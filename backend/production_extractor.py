@@ -43,19 +43,31 @@ def _resolve_binary(name: str) -> str:
     return ""
 
 
+def _ytdlp_python_version() -> str:
+    try:
+        import yt_dlp
+
+        return getattr(yt_dlp.version, "__version__", "installed")
+    except Exception:
+        return ""
+
+
 def tooling_status() -> Dict[str, Any]:
-    tools: Dict[str, Any] = {}
-    for name in ["yt-dlp", "ffmpeg", "ffprobe"]:
+    # yt-dlp is used via its Python API (bundled dependency), not a CLI binary.
+    ytdlp_version = _ytdlp_python_version()
+    tools: Dict[str, Any] = {
+        "yt_dlp": {"available": bool(ytdlp_version), "path": "python:yt_dlp", "version": ytdlp_version},
+    }
+    for name in ["ffmpeg", "ffprobe"]:
         executable = _resolve_binary(name)
         version = ""
         if executable:
-            args = [executable, "--version"] if name == "yt-dlp" else [executable, "-version"]
             try:
-                completed = subprocess.run(args, capture_output=True, text=True, timeout=8, check=False)
+                completed = subprocess.run([executable, "-version"], capture_output=True, text=True, timeout=8, check=False)
                 version = (completed.stdout or completed.stderr or "").strip().splitlines()[0]
             except Exception:
                 version = "installed_version_unavailable"
-        tools[name.replace("-", "_")] = {
+        tools[name] = {
             "available": bool(executable),
             "path": executable,
             "version": version,
@@ -99,9 +111,17 @@ def _run_command(command: List[str], *, timeout: int = 90) -> str:
     return (completed.stdout or "").strip()
 
 
-def _metadata(yt_dlp: str, url: str) -> Dict[str, Any]:
-    raw = _run_command([yt_dlp, "--no-playlist", "--skip-download", "--dump-json", "--no-warnings", url], timeout=90)
-    data = json.loads(raw)
+def _ydl_extract(url: str, fmt: str) -> Dict[str, Any]:
+    """Resolve metadata / stream URL via the bundled yt-dlp Python API (no CLI
+    binary — the packaged sidecar ships yt_dlp as a Python dependency)."""
+    from yt_dlp import YoutubeDL
+
+    with YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True, "format": fmt}) as ydl:
+        return ydl.extract_info(url, download=False) or {}
+
+
+def _metadata(url: str) -> Dict[str, Any]:
+    data = _ydl_extract(url, "best")
     return {
         "id": data.get("id", ""),
         "title_present": bool(data.get("title")),
@@ -111,13 +131,16 @@ def _metadata(yt_dlp: str, url: str) -> Dict[str, Any]:
     }
 
 
-def _stream_url(yt_dlp: str, url: str) -> str:
+def _stream_url(url: str) -> str:
     fmt = "bestvideo[height<=720][ext=mp4]/best[height<=720][ext=mp4]/bestvideo[height<=720]/best"
-    raw = _run_command([yt_dlp, "--no-playlist", "--no-warnings", "-f", fmt, "-g", url], timeout=90)
-    lines = [line.strip() for line in raw.splitlines() if line.strip()]
-    if not lines:
+    info = _ydl_extract(url, fmt)
+    stream = info.get("url") or ""
+    if not stream:
+        formats = info.get("requested_formats") or []
+        stream = (formats[0].get("url") if formats else "") or ""
+    if not stream:
         raise ProductionExtractorError(502, "yt-dlp did not return a media stream URL")
-    return lines[0]
+    return stream
 
 
 def _probe(ffprobe: str, media_url: str) -> Dict[str, Any]:
@@ -225,6 +248,29 @@ def _provider_evidence_to_segments(provider_evidence: List[Dict[str, Any]]) -> L
     ]
 
 
+def _ocr_text_from_evidence(provider_evidence: List[Dict[str, Any]]) -> str:
+    """Clean readable OCR output for the caption box: parse each frame's OCR JSON
+    and collect hard-subtitle / on-screen text lines (deduped), not the raw JSON."""
+    lines: List[str] = []
+    seen = set()
+    for item in provider_evidence:
+        raw = str(item.get("text") or "").strip()
+        if not raw:
+            continue
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        try:
+            data = json.loads(match.group(0) if match else raw)
+        except (ValueError, TypeError):
+            continue
+        for key in ("hard_subtitles", "screen_text"):
+            for entry in data.get(key) or []:
+                text = (entry if isinstance(entry, str) else str((entry or {}).get("text") or "")).strip()
+                if text and text not in seen:
+                    seen.add(text)
+                    lines.append(text)
+    return "\n".join(lines)
+
+
 def _dry_run(target: Dict[str, str], sample_count: int, max_provider_calls: int, user_authorized_media: bool, allow_provider_ocr: bool, confirm_report_only: bool) -> Dict[str, Any]:
     tools = tooling_status()
     errors: List[str] = []
@@ -283,17 +329,16 @@ def run_production_extractor(
         raise ProductionExtractorError(400, "allow_provider_ocr is required for real production extraction")
 
     tools = dry["tooling"]["tools"]
-    yt_dlp = tools["yt_dlp"]["path"]
     ffmpeg = tools["ffmpeg"]["path"]
     ffprobe = tools["ffprobe"]["path"]
-    metadata = _metadata(yt_dlp, target["canonical_url"])
+    metadata = _metadata(target["canonical_url"])
     if metadata["id"] != target["video_id"]:
         raise ProductionExtractorError(502, f"metadata video id mismatch: {metadata['id']}")
     if metadata["duration_seconds"] <= 0:
         raise ProductionExtractorError(502, "video duration unavailable")
     if metadata["duration_seconds"] > CAPS["max_video_duration_seconds_for_frame_probe"]:
         raise ProductionExtractorError(400, f"duration exceeds cap: {metadata['duration_seconds']}")
-    media_url = _stream_url(yt_dlp, target["canonical_url"])
+    media_url = _stream_url(target["canonical_url"])
     stream = _probe(ffprobe, media_url)
 
     frame_records: List[Dict[str, Any]] = []
@@ -426,6 +471,7 @@ def run_production_extractor(
         "provider_evidence_count": len(provider_evidence),
         "provider_evidence": provider_evidence,
         "segments": _provider_evidence_to_segments(provider_evidence),
+        "ocr_text": _ocr_text_from_evidence(provider_evidence),
         "quality": quality,
         "execution_invariants": {
             "full_video_download": False,

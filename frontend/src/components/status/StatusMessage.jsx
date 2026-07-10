@@ -5,7 +5,7 @@ export function recoveryHint(status) {
     return '保護：付費或 provider 操作已停止。下一步：到「設定」檢查每日上限與模型用量。'
   }
   if (message.includes('caption') || message.includes('字幕')) {
-    return '保護：不會自動改走 ASR 或下載媒體。下一步：重試字幕，或改用「語音筆記」明確處理本機音檔。'
+    return '保護：不會自動下載媒體或呼叫雲端。字幕優先；缺字幕時可用下方 ASR（本機轉錄）或 OCR（讀畫面），皆需你明確觸發。'
   }
   if (message.includes('not found')) {
     return '保護：未執行任何寫入。可能原因：更新後舊版背景服務仍佔用連線。下一步：完全結束 App 再重新開啟（必要時重開機）。'

@@ -12,7 +12,7 @@ import app_config
 from model_policy import model_for_task
 from obsidian import get_existing, load_index, save_learning_note
 from runtime_usage import append_runtime_usage_event, usage_from_estimate
-from schemas import EstimateReq, FetchReq, SaveReq, SummarizeReq, TranslateReq
+from schemas import EstimateReq, FetchReq, SaveReq, SummarizeReq, TranslateReq, VideoAudioAsrReq
 from services.library import _estimate, _normalize_summary, _settings, _to_traditional_text
 from services.settings import _check_daily_cap
 from transcript import (
@@ -428,3 +428,15 @@ def index():
     if not vault:
         raise HTTPException(400, "OBSIDIAN_VAULT_PATH is not configured")
     return load_index(vault, subfolder)
+
+
+@router.post("/api/app/video-audio-asr")
+def app_video_audio_asr(req: VideoAudioAsrReq):
+    # ASR rung (CC → ASR → OCR): captionless video → download audio → local whisper.
+    # Operator-gated: only called by an explicit user action in the video lane.
+    import video_audio_asr
+
+    try:
+        return video_audio_asr.transcribe_youtube_audio(req.url, asr_model=req.asr_model or "small")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc

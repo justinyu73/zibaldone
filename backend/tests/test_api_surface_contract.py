@@ -74,6 +74,7 @@ POST /api/app/storage-targets
 POST /api/app/update-token
 POST /api/app/value-signals
 POST /api/app/vault-note-edit
+POST /api/app/video-audio-asr
 POST /api/app/ytdlp-subtitle-fallback-probe
 POST /api/estimate
 POST /api/estimate-source
@@ -100,7 +101,7 @@ class ApiSurfaceContractTests(unittest.TestCase):
         }
 
         self.assertSetEqual(actual, EXPECTED_API_SURFACE)
-        self.assertEqual(len(actual), 76)
+        self.assertEqual(len(actual), 77)
 
 
 if __name__ == "__main__":

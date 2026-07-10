@@ -185,6 +185,11 @@ class AsrModelDownloadReq(BaseModel):
     model: str = "medium"
 
 
+class VideoAudioAsrReq(BaseModel):
+    url: str
+    asr_model: str = "small"
+
+
 class SourceToNoteReq(BaseModel):
     url: str
     vault_path: VaultPath = ""

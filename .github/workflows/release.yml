@@ -65,6 +65,7 @@ jobs:
             --collect-submodules uvicorn --collect-submodules anyio \
             --collect-data trafilatura --collect-data justext --collect-data tld --collect-data certifi \
             --collect-submodules anthropic --collect-submodules google.genai \
+            --collect-submodules yt_dlp --copy-metadata yt-dlp \
             --copy-metadata anthropic --copy-metadata google-genai \
             --hidden-import uvicorn.logging --hidden-import uvicorn.loops.auto \
             --hidden-import uvicorn.protocols.http.auto \
