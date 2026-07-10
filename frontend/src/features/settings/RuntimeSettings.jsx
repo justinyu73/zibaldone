@@ -29,7 +29,7 @@ export default function RuntimeSettings({
       )}
       {runtime ? (
         <div className="settings-form">
-          <div className="note-fields-row">
+          <div className="model-fields">
             <label>翻譯模型<ModelSelect value={runtime.translate_model} onChange={setRuntimeField('translate_model')} options={modelOptions?.translate} /></label>
             <label>摘要模型<ModelSelect value={runtime.summary_model} onChange={setRuntimeField('summary_model')} options={modelOptions?.summary} /></label>
           </div>
