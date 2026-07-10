@@ -1227,6 +1227,9 @@ button.primary.gated-action:not(:disabled) { box-shadow: 0 0 0 1px rgba(217, 130
 .provider-tabs button { display: inline-flex; align-items: center; gap: 7px; }
 
 /* ==== model select (custom dropdown: LOGO + short label) ==== */
+/* 模型下拉各自佔整行：長模型名（如 Gemini 3.1 Flash-Lite（極速省））在兩欄窄格會被截 */
+.model-fields { display: flex; flex-direction: column; gap: 12px; }
+.model-fields > label { display: flex; flex-direction: column; gap: 6px; }
 .model-select { position: relative; }
 .model-select-toggle { width: 100%; display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1.5px solid var(--line-strong);
   border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; font-size: 13px; text-align: left; overflow: hidden; }
