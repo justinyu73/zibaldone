@@ -66,7 +66,7 @@ def _range_start_label(range_key: str) -> tuple[str, str]:
 
 
 _BRAND_BY_PROVIDER = {"openai": "OpenAI", "anthropic": "Anthropic", "google": "Google",
-                      "ollama": "本機", "llamacpp": "本機", "cli": "訂閱"}
+                      "llamacpp": "本機", "cli": "訂閱"}
 
 
 def _cost_breakdown(range_key: str = "month", start_date: str | None = None, end_date: str | None = None) -> Dict[str, Any]:
@@ -111,7 +111,7 @@ def _cost_breakdown(range_key: str = "month", start_date: str | None = None, end
             cost = in_tok / 1e6 * in_price + out_tok / 1e6 * out_price
             b = by_model.setdefault(model, {
                 "model": model, "brand": _BRAND_BY_PROVIDER.get(provider, provider.title()),
-                "kind": "local" if provider in ("ollama", "llamacpp") else "cloud",
+                "kind": "local" if provider == "llamacpp" else "cloud",
                 "provider": provider, "calls": 0, "input_tokens": 0, "output_tokens": 0, "usd": 0.0,
             })
             b["calls"] += calls
@@ -168,21 +168,15 @@ MODEL_OPTIONS: Dict[str, Any] = {
 
 
 def model_options() -> Dict[str, Any]:
-    # Ollama（make_vs_take TAKE）跑著就把已裝本地模型併進 translate/summary 下拉；
-    # 沒跑/沒裝 → 原樣降級（不報錯、不出現）。模型管理走 `ollama pull` CLI，不在此下載。
+    # 內建本機 runtime（spec C）：裝好就把本機 llama.cpp 模型併進 translate/summary 下拉；
+    # 沒裝 → 原樣降級（不報錯、不出現）。下載走 first-run wizard 的內建安裝流程。
     import providers
 
-    tags = providers.ollama_tags()
-    local = ([{"id": f"ollama:{n}", "label": n, "provider": "ollama"} for n in tags["models"]]
-             if tags["running"] else [])
-    # 內建本機 runtime（spec C）：Ollama 優先——沒跑 Ollama 且內建已裝好才出現，
-    # 避免同一台機器出現兩個等價本機選項（固定模式）。
-    if not local:
-        import local_llm_builtin
-        if local_llm_builtin.status()["ready"]:
-            local = [{"id": local_llm_builtin.MODEL_ID,
-                      "label": local_llm_builtin.MODEL_LABEL, "provider": "llamacpp"}]
-    # 訂閱 CLI（spec B）：同 Ollama 範式——偵測到才出現，零設定、app 端零成本。
+    import local_llm_builtin
+    local = ([{"id": local_llm_builtin.MODEL_ID,
+               "label": local_llm_builtin.MODEL_LABEL, "provider": "llamacpp"}]
+             if local_llm_builtin.status()["ready"] else [])
+    # 訂閱 CLI（spec B）：同範式——偵測到才出現，零設定、app 端零成本。
     subscription = providers.cli_options()
     extra = local + subscription
     if not extra:

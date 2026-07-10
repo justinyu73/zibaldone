@@ -6,7 +6,7 @@ export const PROVIDER_META = {
   openai: { label: 'OpenAI', cost: '雲端·付費', placeholder: 'sk-...（只存本機家目錄，不進 repo、不顯示明文）' },
   anthropic: { label: 'Claude', cost: '雲端·付費', placeholder: 'sk-ant-...（只存本機家目錄，不進 repo、不顯示明文）' },
   google: { label: 'Gemini', cost: '雲端·付費', placeholder: 'AIza...（只存本機家目錄，不進 repo、不顯示明文）' },
-  ollama: { label: '本地 Ollama', cost: '免費' },
+  llamacpp: { label: '內建本機 AI', cost: '免費' },
   cli: { label: '訂閱 CLI', cost: '訂閱額度·app 零成本' },
 }
 
@@ -14,8 +14,8 @@ export const PROVIDER_ORDER = ['openai', 'anthropic', 'google']
 
 export function providerForModel(id, options = []) {
   return options.find((option) => option.id === id)?.provider
-    || (String(id || '').startsWith('ollama:')
-      ? 'ollama'
+    || (String(id || '').startsWith('llamacpp:')
+      ? 'llamacpp'
       : String(id || '').startsWith('cli:')
         ? 'cli'
       : String(id || '').startsWith('claude')
@@ -32,7 +32,7 @@ export function providerLabelForModel(id, options = []) {
 
 // 精簡：LOGO 代表 provider，短標籤只留「模型名 + 單一費用字」，不重複 provider/雲端。
 export function costTag(provider) {
-  if (provider === 'ollama') return '免費'
+  if (provider === 'llamacpp') return '免費'
   if (provider === 'cli') return '零成本'
   return '付費'
 }
@@ -46,7 +46,7 @@ function ModelRow({ option, compact, toggle = false }) {
       <span className="ms-name">{name}</span>
       {/* 收合鈕在窄欄位省略「推薦」小標，優先讓模型名可讀，避免版位超出 */}
       {!toggle && option.recommended && <span className="ms-rec">推薦</span>}
-      <span className={`ms-tag ${provider === 'ollama' || provider === 'cli' ? 'free' : 'paid'}`}>{costTag(provider)}</span>
+      <span className={`ms-tag ${provider === 'llamacpp' || provider === 'cli' ? 'free' : 'paid'}`}>{costTag(provider)}</span>
     </span>
   )
 }

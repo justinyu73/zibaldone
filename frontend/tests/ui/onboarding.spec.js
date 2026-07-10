@@ -28,10 +28,10 @@ test('first-run setup is optional, read-only, persistent, and reopenable', async
   await expect(routeDialog.getByRole('button', { name: /先用免費路線/ })).toHaveAttribute('aria-pressed', 'true')
   await routeDialog.getByRole('button', { name: '下一步' }).click()
 
-  // 本機 AI 步驟：三種環境狀態（無 Ollama / 有 Ollama 缺模型 / 就緒）都可直接略過
+  // 本機 AI 步驟：內建 llama.cpp 各狀態（選配未裝 / 下載中 / 就緒）都可直接略過
   const llmDialog = page.getByRole('dialog', { name: '本機 AI' })
   await expect(llmDialog).toBeVisible()
-  await expect(llmDialog.getByText(/本機 AI 為選配|尚未安裝推薦模型|本機 AI 就緒|下載.*中/)).toBeVisible()
+  await expect(llmDialog.getByText(/本機 AI 為選配|本機 AI 就緒|下載.*中/)).toBeVisible()
   await llmDialog.getByRole('button', { name: '下一步' }).click()
 
   const checkDialog = page.getByRole('dialog', { name: '環境確認' })

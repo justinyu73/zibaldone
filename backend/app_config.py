@@ -122,9 +122,9 @@ def load_key_into_env() -> None:
 
 # ---- Runtime settings (non-secret): models + cost caps ----
 DEFAULT_SETTINGS: dict[str, Any] = {
-    # 主備對調：本機 Ollama 為翻譯預設（零雲端成本），雲端 gpt-5-mini 退為 fallback
-    # （enabled_models.json tasks.translate.fallbacks）。Ollama 沒跑→鏈自動退雲端。
-    "translate_model": "ollama:gemma3:4b",
+    # 內建 llama.cpp 為翻譯預設（本地 gguf、免金鑰、零雲端成本），雲端 gpt-5-mini 退為
+    # fallback（enabled_models.json tasks.translate.fallbacks）。內建未安裝→鏈自動退雲端。
+    "translate_model": "llamacpp:gemma-3-4b-it",
     "summary_model": "gpt-5.2",
     "per_job_cap_usd": 0.03,
     "daily_cap_usd": 0.50,
@@ -198,8 +198,8 @@ CONSERVATIVE_DEFAULT_PRICE: tuple[float, float] = (15.0, 75.0)
 
 def price_for_model(model: str) -> tuple[float, float]:
     """(input, output) USD per 1M tokens. Config override > built-in table > conservative default."""
-    if str(model or "").lower().startswith(("ollama:", "cli:", "llamacpp:")):
-        return (0.0, 0.0)  # 本地 Ollama / 內建 llama.cpp / 訂閱 CLI：app 端零 API 成本
+    if str(model or "").lower().startswith(("cli:", "llamacpp:")):
+        return (0.0, 0.0)  # 內建 llama.cpp / 訂閱 CLI：app 端零 API 成本
     override = (load_app_config().get("model_prices") or {}).get(model)
     if isinstance(override, dict) and override.get("input") is not None and override.get("output") is not None:
         return float(override["input"]), float(override["output"])

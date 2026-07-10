@@ -1,10 +1,11 @@
-"""Multi-provider LLM routing (OpenAI / Anthropic Claude / Google Gemini / 本地 Ollama).
+"""Multi-provider LLM routing (OpenAI / Anthropic Claude / Google Gemini /
+built-in llama.cpp / 訂閱 CLI).
 
 A single `chat_complete` picks the provider from the model id, calls that SDK
 with its own key (from app_config), and returns a normalized {text, usage}.
 Adding a provider = one branch here + its key in app_config + models in the
 registry; callers (translate / summarize) stay provider-agnostic.
-Ollama（make_vs_take TAKE）= 本地 HTTP，免金鑰、零雲端成本。
+Keyless local routes = built-in llama.cpp（本地 gguf）與訂閱 CLI，皆零雲端成本。
 """
 from __future__ import annotations
 
@@ -13,15 +14,9 @@ import os
 import re
 import shutil
 import subprocess
-import urllib.error
-import urllib.request
 from typing import Any
 
 import app_config
-
-
-def ollama_host() -> str:
-    return os.getenv("OLLAMA_HOST", "127.0.0.1:11434").rstrip("/")
 
 
 # 訂閱 CLI provider（spec B, docs/design/no_api_model_routes_spec.md）：借用使用者已
@@ -77,8 +72,6 @@ class ProviderError(RuntimeError):
 
 def detect_provider(model: str) -> str:
     m = (model or "").lower()
-    if m.startswith("ollama:"):
-        return "ollama"
     if m.startswith("cli:"):
         return "cli"
     if m.startswith("llamacpp:"):
@@ -111,15 +104,12 @@ def _norm_usage(input_tokens: Any, output_tokens: Any) -> dict[str, Any]:
 
 def chat_complete(*, model: str, prompt: str, system: str | None = None, json_mode: bool = False, json_schema: dict[str, Any] | None = None, max_tokens: int = 4096) -> dict[str, Any]:
     provider = detect_provider(model)
-    keyless = provider in ("ollama", "cli", "llamacpp")
+    keyless = provider in ("cli", "llamacpp")
     key = "" if keyless else app_config.get_provider_key(provider)
     if not keyless and not key:
         raise ProviderError(f"{provider} API 金鑰未設定（請到設定填入）")
 
-    if provider == "ollama":
-        text, usage = _ollama_chat(model, prompt, system, json_mode, json_schema, max_tokens)
-
-    elif provider == "cli":
+    if provider == "cli":
         text, usage = _cli_chat(model, prompt, system, json_mode, json_schema)
 
     elif provider == "llamacpp":
@@ -204,38 +194,3 @@ def _cli_chat(model: str, prompt: str, system: str | None, json_mode: bool, json
         raise ProviderError(f"訂閱 CLI（{tool}）呼叫失敗：{detail}——確認已登入（終端機跑一次 {tool}）")
     # 訂閱吃使用者自己的方案額度，app 端記 0 成本、0 token（無可靠 usage 來源，不杜撰）。
     return text, _norm_usage(0, 0)
-
-
-def _ollama_chat(model: str, prompt: str, system: str | None, json_mode: bool, json_schema: dict[str, Any] | None, max_tokens: int):
-    name = model.split(":", 1)[1] if model.lower().startswith("ollama:") else model
-    messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
-    body: dict[str, Any] = {"model": name, "messages": messages, "stream": False, "options": {"num_predict": max_tokens}}
-    if json_schema:
-        body["format"] = json_schema  # 結構化輸出：受限解碼，小模型/長輸入也守 schema（比 "json" 穩）
-    elif json_mode:
-        body["format"] = "json"
-    req = urllib.request.Request(
-        f"http://{ollama_host()}/api/chat",
-        data=json.dumps(body).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, OSError) as exc:
-        raise ProviderError(f"無法連到本地 Ollama（{ollama_host()}）：請先 `ollama serve`。{exc}") from exc
-    text = (data.get("message") or {}).get("content") or ""
-    usage = _norm_usage(data.get("prompt_eval_count"), data.get("eval_count"))
-    return text, usage
-
-
-def ollama_tags() -> dict[str, Any]:
-    """偵測本地 Ollama：跑著就回 {running, models:[name...]}；沒跑回 running=False（不報錯，乾淨降級）。"""
-    try:
-        with urllib.request.urlopen(f"http://{ollama_host()}/api/tags", timeout=2) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, OSError, json.JSONDecodeError):
-        return {"running": False, "models": []}
-    models = [m.get("name") for m in data.get("models", []) if m.get("name")]
-    return {"running": True, "models": models}

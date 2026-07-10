@@ -390,7 +390,7 @@ def app_state_free_translate(req: FreeTranslateReq):
 
         model = app_config.get_settings()["translate_model"]
         provider = providers.detect_provider(model)
-        if provider not in ("ollama", "cli", "llamacpp") and not app_config.get_provider_key(provider):
+        if provider not in ("cli", "llamacpp") and not app_config.get_provider_key(provider):
             raise HTTPException(502, f"免費翻譯端點暫時被擋，且 fallback 需要 {provider} 金鑰（翻譯模型 {model}）——可先讀原文，或到設定填金鑰") from gtx_exc
         _check_daily_cap()
         prompt = f"把以下內容翻成繁體中文，只回譯文、不要前後說明：\n\n{req.text[:24000]}"

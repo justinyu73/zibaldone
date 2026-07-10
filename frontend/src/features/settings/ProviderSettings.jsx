@@ -30,7 +30,7 @@ export default function ProviderSettings({
         <span>{keyStatus
           ? (selected?.key_set
             ? `已設定 …${selected.key_hint}（來源：${selected.source === 'config' ? '本機設定檔' : selected.source === 'env' ? '.env（建議改存本機）' : '—'}）`
-            : '未設定金鑰；字幕抓取、本機筆記與 Ollama 本地模型不受影響，翻譯與 AI 摘要才需要金鑰。')
+            : '未設定金鑰；字幕抓取、本機筆記與內建本機 AI 不受影響，翻譯與 AI 摘要才需要金鑰。')
           : '讀取 provider 狀態中…'}</span>
       </div>
       <label>輸入 / 更換 {PROVIDER_META[provider].label} 金鑰

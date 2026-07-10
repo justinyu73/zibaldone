@@ -17,7 +17,8 @@ The app does not require a hosted account and does not include telemetry.
 | Article extraction | The URL supplied by the user | User requests article fetch |
 | Cloud transcription | Selected transcription provider | User selects a cloud/paid ASR route and confirms |
 | AI translation/summary | OpenAI, Anthropic, or Google | User selects a cloud model and executes the action |
-| Local model inference | Loopback Ollama | User selects an installed Ollama model |
+| Local model inference | Loopback built-in llama.cpp (127.0.0.1) | User selects the built-in local model |
+| Built-in model download | llama.cpp release + model host | First-use install of the built-in local runtime |
 | Update check/download | This project's GitHub Release | User checks for or installs an update |
 | Radar/news scan | Configured feeds, HN, or GitHub | User runs the radar scan |
 

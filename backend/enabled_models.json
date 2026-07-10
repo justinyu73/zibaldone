@@ -8,7 +8,7 @@
     "durable_write": "disabled_by_default_report_only"
   },
   "defaults": {
-    "translate": "ollama:gemma3:4b",
+    "translate": "llamacpp:gemma-3-4b-it",
     "summary": "gpt-5.2",
     "asr": "whisper-1",
     "asr_bulk": "gpt-4o-mini-transcribe",
@@ -20,7 +20,7 @@
   "tasks": {
     "translate": {
       "enabled": true,
-      "model": "ollama:gemma3:4b",
+      "model": "llamacpp:gemma-3-4b-it",
       "fallbacks": ["gpt-5-mini"],
       "env": "OPENAI_TRANSLATE_MODEL",
       "endpoint": "responses_or_chat"

@@ -44,7 +44,7 @@ def model_for_task(task: str, fallback: str = "gpt-5-mini") -> str:
 def models_for_task(task: str, fallback: str = "gpt-5-mini") -> list[str]:
     """Resolution chain for a task: [primary, *configured fallbacks]. Local-first —
     fallbacks come ONLY from enabled_models.json tasks.<task>.fallbacks (the operator
-    opts in, e.g. a local `ollama:` model as backup); nothing external is auto-added.
+    opts in, e.g. a local `llamacpp:` model as backup); nothing external is auto-added.
     Empty fallbacks = identical to model_for_task (single provider, current behavior)."""
     primary = model_for_task(task, fallback)
     chain = [primary]

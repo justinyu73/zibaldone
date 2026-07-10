@@ -22,7 +22,7 @@ describe('cost formatting', () => {
     expect(brandKey('Anthropic')).toBe('claude')
     expect(brandKey('OpenAI GPT-4')).toBe('openai')
     expect(brandKey('Google Gemini')).toBe('gemini')
-    expect(brandKey('Ollama')).toBe('ollama')
+    expect(brandKey('本機')).toBe('local')
     expect(brandKey('SomethingElse')).toBe('generic')
   })
 })

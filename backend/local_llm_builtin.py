@@ -1,6 +1,6 @@
 """內建本機 LLM runtime（llama.cpp llama-server）＋首用下載（spec C）。
 
-Ollama 跑著時不出場（spec A 優先）；乾淨機器免裝 Ollama 也能離線翻譯/摘要。
+乾淨機器免裝任何外部工具，裝好即為預設本機翻譯/摘要模型，離線、免金鑰。
 runtime binary（10-17MB）與模型 gguf（~2.4GB）都不進安裝包（85.8MB budget，
 spike 2026-07-05：打包會推到 96-104MB 跨 warn 線）→ 全部首用下載。
 下載沿用 ASR model 的 .part+原子搬移＋background+poll+lock 範式（不平行造）。

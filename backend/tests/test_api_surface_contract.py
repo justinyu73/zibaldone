@@ -55,7 +55,6 @@ POST /api/app/inbox-review
 POST /api/app/inbox-trash
 POST /api/app/local-asr-model/download
 POST /api/app/local-llm/builtin/install
-POST /api/app/local-llm/pull
 POST /api/app/local-asr-report-only-probe
 POST /api/app/meeting-audio-repair
 POST /api/app/meeting-audio-ticket
@@ -101,7 +100,7 @@ class ApiSurfaceContractTests(unittest.TestCase):
         }
 
         self.assertSetEqual(actual, EXPECTED_API_SURFACE)
-        self.assertEqual(len(actual), 77)
+        self.assertEqual(len(actual), 76)
 
 
 if __name__ == "__main__":

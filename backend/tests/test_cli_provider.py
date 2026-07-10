@@ -20,7 +20,7 @@ class DetectProviderTests(unittest.TestCase):
         self.assertEqual(providers.detect_provider("CLI:codex"), "cli")
 
     def test_existing_prefixes_unchanged(self):
-        self.assertEqual(providers.detect_provider("ollama:gemma3:4b"), "ollama")
+        self.assertEqual(providers.detect_provider("llamacpp:gemma-3-4b-it"), "llamacpp")
         self.assertEqual(providers.detect_provider("claude-sonnet-4-6"), "anthropic")
         self.assertEqual(providers.detect_provider("gpt-5-mini"), "openai")
 

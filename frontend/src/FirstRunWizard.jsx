@@ -111,22 +111,6 @@ export default function FirstRunWizard({
     }
   }
 
-  async function startPull() {
-    try {
-      const response = await request('/app/local-llm/pull', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      const body = await response.json()
-      if (!response.ok) throw new Error(body.detail || '模型下載啟動失敗')
-    } catch (error) {
-      setLlm((current) => ({ ...current, pull: { status: 'error', error: error.message } }))
-      return
-    }
-    refreshLlm()
-  }
-
   async function startBuiltinInstall() {
     try {
       const response = await request('/app/local-llm/builtin/install', { method: 'POST' })
@@ -148,8 +132,7 @@ export default function FirstRunWizard({
   }, [step, backendReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const downloading = llm?.pull?.status === 'downloading'
-      || llm?.builtin?.download?.status === 'downloading'
+    const downloading = llm?.builtin?.download?.status === 'downloading'
     if (step !== 3 || !downloading) return
     const timer = setTimeout(refreshLlm, 1200)
     return () => clearTimeout(timer)
@@ -240,7 +223,7 @@ export default function FirstRunWizard({
             <div className="setup-form">
               <div className="setup-route" role="group" aria-label="預設處理路線">
                 <button className={route === 'local' ? 'active' : ''} aria-pressed={route === 'local'} onClick={() => setRoute('local')}>
-                  <Laptop size={18} /><span><strong>先用免費路線</strong><small>字幕抓取、本機筆記、Ollama 本地模型均可用；翻譯與 AI 摘要才需金鑰</small></span>
+                  <Laptop size={18} /><span><strong>先用免費路線</strong><small>字幕抓取、本機筆記、內建本機 AI 均可用；翻譯與 AI 摘要才需金鑰</small></span>
                 </button>
                 <button className={route === 'cloud' ? 'active' : ''} aria-pressed={route === 'cloud'} onClick={() => setRoute('cloud')}>
                   <Cloud size={18} /><span><strong>啟用雲端模型</strong><small>可能依供應商計費</small></span>
@@ -270,38 +253,22 @@ export default function FirstRunWizard({
                   <div className="settings-state error">{llm.error}</div>
                   <button onClick={refreshLlm}><RefreshCw size={16} />重新偵測</button>
                 </>
-              ) : !llm?.running ? (
-                llm?.builtin?.ready ? (
-                  <div className="settings-state ok">內建本機 AI 就緒——{llm.builtin.model_label} 可離線用於翻譯與 AI 摘要，無需金鑰。</div>
-                ) : llm?.builtin?.download?.status === 'downloading' ? (
-                  <>
-                    <div className="setup-loading"><LoaderCircle size={20} className="spin" />下載內建本機 AI（{llm.builtin.download.stage === 'model' ? '模型' : '執行引擎'}）中…{pullProgressText(llm.builtin.download)}</div>
-                    <div className="settings-note">可直接按「下一步」，下載會在背景繼續完成。</div>
-                  </>
-                ) : (
-                  <>
-                    {llm?.builtin?.download?.status === 'error' && <div className="settings-state error">下載失敗：{llm.builtin.download.error}</div>}
-                    <div className="settings-state info">本機 AI 為選配：啟用後，翻譯與 AI 摘要可離線、免金鑰使用。</div>
-                    {llm?.builtin?.supported && (
-                      <button className="primary" onClick={startBuiltinInstall}><Download size={16} />{llm?.builtin?.download?.status === 'error' ? '重試下載' : '下載內建本機 AI'}（引擎約 15MB＋模型約 2.4GB，一次性）</button>
-                    )}
-                    <div className="settings-note">已有 <a href="https://ollama.com" target="_blank" rel="noreferrer">Ollama</a> 的話，啟動它後按「重新偵測」即可沿用；都不需要的話按「下一步」略過。</div>
-                    <button onClick={refreshLlm}><RefreshCw size={16} />重新偵測</button>
-                  </>
-                )
-              ) : llm.recommended_installed ? (
-                <div className="settings-state ok">本機 AI 就緒——模型 {llm.recommended} 已可用於翻譯與 AI 摘要，無需金鑰。</div>
-              ) : llm.pull?.status === 'downloading' ? (
+              ) : llm?.builtin?.ready ? (
+                <div className="settings-state ok">內建本機 AI 就緒——{llm.builtin.model_label} 可離線用於翻譯與 AI 摘要，無需金鑰。</div>
+              ) : llm?.builtin?.download?.status === 'downloading' ? (
                 <>
-                  <div className="setup-loading"><LoaderCircle size={20} className="spin" />下載 {llm.recommended} 中…{pullProgressText(llm.pull)}</div>
+                  <div className="setup-loading"><LoaderCircle size={20} className="spin" />下載內建本機 AI（{llm.builtin.download.stage === 'model' ? '模型' : '執行引擎'}）中…{pullProgressText(llm.builtin.download)}</div>
                   <div className="settings-note">可直接按「下一步」，下載會在背景繼續完成。</div>
                 </>
               ) : (
                 <>
-                  {llm.pull?.status === 'error' && <div className="settings-state error">下載失敗：{llm.pull.error}</div>}
-                  <div className="settings-state info">Ollama 已啟動，尚未安裝推薦模型。</div>
-                  <button className="primary" onClick={startPull}><Download size={16} />{llm.pull?.status === 'error' ? '重試下載' : '下載推薦模型'} {llm.recommended}（約 3GB，一次性）</button>
-                  <div className="settings-note">下載後翻譯與 AI 摘要即可離線使用；不影響雲端模型選項。</div>
+                  {llm?.builtin?.download?.status === 'error' && <div className="settings-state error">下載失敗：{llm.builtin.download.error}</div>}
+                  <div className="settings-state info">本機 AI 為選配：啟用後，翻譯與 AI 摘要可離線、免金鑰使用。</div>
+                  {llm?.builtin?.supported && (
+                    <button className="primary" onClick={startBuiltinInstall}><Download size={16} />{llm?.builtin?.download?.status === 'error' ? '重試下載' : '下載內建本機 AI'}（引擎約 15MB＋模型約 2.4GB，一次性）</button>
+                  )}
+                  <div className="settings-note">不需要的話按「下一步」略過；也可改用雲端金鑰或訂閱 CLI 承接翻譯與摘要。</div>
+                  <button onClick={refreshLlm}><RefreshCw size={16} />重新偵測</button>
                 </>
               )}
             </div>

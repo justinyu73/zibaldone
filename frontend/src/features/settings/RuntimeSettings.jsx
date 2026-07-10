@@ -35,7 +35,7 @@ export default function RuntimeSettings({
           </div>
           <div className="settings-note">
             <KeyRound size={14} />
-            <span>模型呼叫的 provider：翻譯 {modelProvider(runtime.translate_model)}、摘要 {modelProvider(runtime.summary_model)}。雲端用對應金鑰；本地 Ollama 免金鑰、零雲端成本。</span>
+            <span>模型呼叫的 provider：翻譯 {modelProvider(runtime.translate_model)}、摘要 {modelProvider(runtime.summary_model)}。雲端用對應金鑰；內建本機 AI 免金鑰、零雲端成本。</span>
           </div>
           <label className="settings-toggle">
             <input type="checkbox" checked={Boolean(runtime.cli_providers_enabled)}

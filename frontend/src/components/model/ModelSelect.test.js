@@ -9,7 +9,7 @@ describe('model provider resolution', () => {
   })
 
   it('preserves legacy model-name inference', () => {
-    expect(providerForModel('ollama:gemma3')).toBe('ollama')
+    expect(providerForModel('llamacpp:gemma-3-4b-it')).toBe('llamacpp')
     expect(providerForModel('claude-sonnet')).toBe('anthropic')
     expect(providerForModel('gemini-flash')).toBe('google')
     expect(providerForModel('gpt-5-mini')).toBe('openai')

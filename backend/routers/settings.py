@@ -27,7 +27,7 @@ def app_setup_readiness(vault_root: str = ""):
     local_models = sorted({
         option["id"] for lane in ("translate", "summary")
         for option in model_options.get(lane, [])
-        if option.get("provider") == "ollama"
+        if option.get("provider") == "llamacpp"
     })
     return {
         "ok": True,

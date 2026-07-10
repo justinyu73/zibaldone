@@ -28,18 +28,20 @@ export default function SummaryModelPicker({ transcriptionRoute = 'local', evide
     try { await postJson('/app/settings', { summary_model: v }) } catch { /* 設定頁仍可改 */ }
   }
   const provider = providerForModel(model, opts?.summary || [])
-  const summaryLocal = provider === 'ollama'
+  // 摘要成本分類：內建本機＝免費、訂閱 CLI＝零成本、其餘雲端＝付費。
+  const summaryFree = provider === 'llamacpp' || provider === 'cli'
+  const summaryCost = provider === 'llamacpp' ? '本機・免費' : provider === 'cli' ? '訂閱・零成本' : '雲端・付費'
   const transcriptLabel = evidenceLabel || (transcriptionRoute === 'provided'
     ? '轉錄：已提供・免費'
     : transcriptionRoute === 'cloud' ? '轉錄：雲端・付費' : '轉錄：本機・免費')
-  const summaryLabel = `摘要：${PROVIDER_META[provider]?.label || provider}・${summaryLocal ? '本機・免費' : '雲端・付費'}`
+  const summaryLabel = `摘要：${PROVIDER_META[provider]?.label || provider}・${summaryCost}`
   return (
     <div className="summary-model-pick" title="轉錄與摘要是兩個獨立步驟，可能分別免費或付費。">
       <label><span>摘要模型</span><ModelSelect value={model} onChange={change} options={opts?.summary} compact /></label>
       <div className="processing-cost-route" aria-label="本次處理成本路線">
         <span className={`state-chip ${transcriptionRoute === 'cloud' ? 'cost-paid' : 'cost-free'}`}>{transcriptLabel}</span>
         <span aria-hidden="true">→</span>
-        <span className={`state-chip ${summaryLocal ? 'cost-free' : 'cost-paid'}`}>{summaryLabel}</span>
+        <span className={`state-chip ${summaryFree ? 'cost-free' : 'cost-paid'}`}>{summaryLabel}</span>
       </div>
     </div>
   )
