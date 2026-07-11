@@ -93,7 +93,12 @@ def write_index(vault_path: str, subfolder: str, data: dict[str, Any]) -> None:
 
 
 def get_existing(vault_path: str, subfolder: str, video_id: str) -> Optional[dict[str, Any]]:
-    return load_index(vault_path, subfolder).get("items", {}).get(video_id)
+    # Read-only duplicate check during preview/fetch: a not-yet-created vault
+    # folder just means "no existing note" — it must not 500 the whole fetch.
+    try:
+        return load_index(vault_path, subfolder).get("items", {}).get(video_id)
+    except (FileNotFoundError, NotADirectoryError):
+        return None
 
 
 def _language_summary(transcript_en: str, transcript_zh: str, languages: list[str]) -> str:
