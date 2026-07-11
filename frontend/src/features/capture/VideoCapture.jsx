@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  AlertTriangle, Captions, Clapperboard, Coins, Database, Eye, FileText, Globe, Languages,
+  AlertTriangle, Captions, Clapperboard, Coins, Database, Download, Eye, FileText, Globe, Languages,
   LockKeyhole, PlayCircle, Route, Save, ShieldCheck, Sparkles, Trash2,
 } from 'lucide-react'
 import { deriveVaultPaths } from '../../paths'
@@ -29,6 +29,36 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
   const [mode, setMode] = useState('quick')
   const [costs, setCosts] = useState(null) // { quick, deep } estimates
   const [overwriteAsk, setOverwriteAsk] = useState(false)
+  const [ffmpegReady, setFfmpegReady] = useState(null) // null=unknown, false, true
+  const noCaptions = Boolean(fetched && !enText && !zhText)
+  // ASR/OCR need ffmpeg; check readiness when the no-caption fallback appears so we
+  // can offer a one-time download instead of failing with "ffmpeg missing".
+  useEffect(() => {
+    if (!noCaptions) return undefined
+    let cancelled = false
+    apiFetch('/app/ffmpeg/status').then((r) => r.json())
+      .then((s) => { if (!cancelled) setFfmpegReady(Boolean(s.ready)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [noCaptions])
+
+  async function installFfmpeg() {
+    setBusy('ffmpeg'); setStatus({ type: 'info', message: '下載媒體工具（ffmpeg/ffprobe）中，一次性…' })
+    try {
+      await postJson('/app/ffmpeg/install', {})
+      for (let i = 0; i < 300; i++) {
+        await new Promise((r) => setTimeout(r, 1500))
+        const s = await apiFetch('/app/ffmpeg/status').then((r) => r.json())
+        if (s.ready) { setFfmpegReady(true); setStatus({ type: 'ok', message: '媒體工具已就緒，可用 ASR/OCR。' }); return }
+        const err = s.download?.ffmpeg?.error || s.download?.ffprobe?.error
+        if (err) throw new Error(err)
+      }
+      throw new Error('下載逾時')
+    } catch (e) {
+      setStatus({ type: 'error', message: `媒體工具下載失敗：${e.message}` })
+    } finally { setBusy('') }
+  }
+
   const estimate = costs ? (mode === 'quick' ? costs.quick : costs.deep) : null
   const sourceLabel = fetched?.meta?.title || (videoId ? `YouTube ${videoId}` : '尚未載入來源')
   const evidenceState = fetched
@@ -261,13 +291,20 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
               aria-label={lang === 'en' ? '原文字幕審查區' : '中文字幕審查區'}
               onChange={(e) => (lang === 'en' ? setEnText(e.target.value) : setZhText(e.target.value))}
               placeholder="字幕內容（抓取後可校正）。這裡是 AI 摘要前的人為審查區。" />
-            {fetched && !enText && !zhText && (
+            {noCaptions && (
               <div className="caption-fallback">
                 <div className="settings-note">字幕優先；此來源無可用字幕。可用進階本機能力（免金鑰、離線；收斂在影片筆記流程內）：</div>
-                <div className="panel-actions">
-                  <button onClick={runVideoAsr} disabled={busy === 'asr'}><Captions size={16} />{busy === 'asr' ? '轉錄中...' : '下載音檔並轉錄（ASR）'}</button>
-                  <button onClick={runVideoOcr} disabled={busy === 'ocr'}><FileText size={16} />{busy === 'ocr' ? '讀取中...' : '讀畫面硬字幕（OCR）'}</button>
-                </div>
+                {ffmpegReady === false ? (
+                  <div className="panel-actions">
+                    <button className="primary" onClick={installFfmpeg} disabled={busy === 'ffmpeg'}><Download size={16} />{busy === 'ffmpeg' ? '下載中…' : '下載媒體工具（ffmpeg，約 50MB・一次性）'}</button>
+                    <span className="settings-note">ASR/OCR 需要 ffmpeg；app 自帶下載，不需自行安裝。</span>
+                  </div>
+                ) : (
+                  <div className="panel-actions">
+                    <button onClick={runVideoAsr} disabled={busy === 'asr'}><Captions size={16} />{busy === 'asr' ? '轉錄中...' : '下載音檔並轉錄（ASR）'}</button>
+                    <button onClick={runVideoOcr} disabled={busy === 'ocr'}><FileText size={16} />{busy === 'ocr' ? '讀取中...' : '讀畫面硬字幕（OCR）'}</button>
+                  </div>
+                )}
               </div>
             )}
           </section>

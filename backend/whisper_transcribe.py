@@ -52,9 +52,10 @@ def transcribe(
         return {"ok": False, "error_code": "audio_not_found", "message": f"找不到音檔：{source.as_posix()}"}
     if not binary.exists() or not model.exists():
         return {"ok": False, "error_code": "runtime_not_ready", "message": "whisper.cpp 執行檔或模型不存在"}
-    ffmpeg = shutil.which("ffmpeg")
+    import ffmpeg_runtime
+    ffmpeg = ffmpeg_runtime.resolve("ffmpeg")
     if not ffmpeg:
-        return {"ok": False, "error_code": "ffmpeg_unavailable", "message": "ffmpeg 不可用，無法轉檔"}
+        return {"ok": False, "error_code": "ffmpeg_unavailable", "message": "ffmpeg 尚未就緒（請先下載媒體工具）"}
 
     tmp_root = Path(tempfile.mkdtemp(prefix="yt_note_asr_"))
     wav_path = tmp_root / "input16k.wav"

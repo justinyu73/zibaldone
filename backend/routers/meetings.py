@@ -238,3 +238,22 @@ def app_local_llm_builtin_install():
         return local_llm_builtin.start_install()
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/api/app/ffmpeg/status")
+def app_ffmpeg_status():
+    # 媒體工具鏈就緒狀態（ASR/OCR 需 ffmpeg/ffprobe）+ 首用下載進度。
+    import ffmpeg_runtime
+
+    return ffmpeg_runtime.status()
+
+
+@router.post("/api/app/ffmpeg/install")
+def app_ffmpeg_install():
+    # 首用下載 static ffmpeg+ffprobe（背景執行緒，UI 輪詢 /ffmpeg/status）。
+    import ffmpeg_runtime
+
+    try:
+        return ffmpeg_runtime.start_install()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
