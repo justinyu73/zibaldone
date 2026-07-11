@@ -116,10 +116,23 @@ def _run_command(command: List[str], *, timeout: int = 90) -> str:
 
 def _ydl_extract(url: str, fmt: str) -> Dict[str, Any]:
     """Resolve metadata / stream URL via the bundled yt-dlp Python API (no CLI
-    binary — the packaged sidecar ships yt_dlp as a Python dependency)."""
+    binary — the packaged sidecar ships yt_dlp as a Python dependency).
+
+    player_client=android first: it returns direct stream URLs that don't require
+    the nsig JS descramble, so ffprobe/ffmpeg don't hit intermittent 403s when no
+    JS runtime (deno) is installed. web is kept as a fallback.
+    """
     from yt_dlp import YoutubeDL
 
-    with YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True, "format": fmt}) as ydl:
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "noplaylist": True,
+        "format": fmt,
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+    }
+    with YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False) or {}
 
 
@@ -341,8 +354,22 @@ def run_production_extractor(
         raise ProductionExtractorError(502, "video duration unavailable")
     if metadata["duration_seconds"] > CAPS["max_video_duration_seconds_for_frame_probe"]:
         raise ProductionExtractorError(400, f"duration exceeds cap: {metadata['duration_seconds']}")
-    media_url = _stream_url(target["canonical_url"])
-    stream = _probe(ffprobe, media_url)
+    # YouTube stream URLs can intermittently 403 (throttle/expiry/nsig). Re-extract
+    # a fresh URL and re-probe a few times before giving up, so a flaky 403 doesn't
+    # fail the whole OCR run.
+    media_url = ""
+    stream: Dict[str, Any] = {}
+    last_error: ProductionExtractorError | None = None
+    for _ in range(3):
+        try:
+            media_url = _stream_url(target["canonical_url"])
+            stream = _probe(ffprobe, media_url)
+            break
+        except ProductionExtractorError as exc:
+            last_error = exc
+            media_url = ""
+    if not media_url:
+        raise last_error or ProductionExtractorError(502, "could not resolve a playable stream")
 
     frame_records: List[Dict[str, Any]] = []
     provider_evidence: List[Dict[str, Any]] = []

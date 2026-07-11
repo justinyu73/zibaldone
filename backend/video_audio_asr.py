@@ -25,6 +25,9 @@ def _bestaudio_stream(url: str) -> tuple[str, float]:
         "skip_download": True,
         "noplaylist": True,
         "format": "bestaudio[ext=m4a]/bestaudio/best",
+        # android client → direct URLs without nsig JS descramble, avoiding the
+        # intermittent 403s ffmpeg hits when no JS runtime (deno) is installed.
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     }
     with YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
