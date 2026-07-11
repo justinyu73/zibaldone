@@ -22,7 +22,10 @@ CAPS = {
     "max_sampled_frames": 6,
     "max_provider_calls": 6,
     "max_frame_bytes_total": 25_000_000,
-    "max_video_duration_seconds_for_frame_probe": 900,
+    # OCR samples a fixed max_sampled_frames regardless of length, so cost is
+    # bounded by frame/provider caps — not duration. Keep a generous ceiling only
+    # as a sanity bound; a 15-min limit needlessly blocked normal long-form videos.
+    "max_video_duration_seconds_for_frame_probe": 14400,
     "max_runtime_seconds": 240,
     "storage_root": "/tmp",
 }
