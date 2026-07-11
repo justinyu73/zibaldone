@@ -390,6 +390,14 @@ fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<
         log::info!("[sidecar] resolved PATH: {} entries", path.split(':').filter(|part| !part.is_empty()).count());
         command.env("PATH", path);
     }
+    // The onedir sidecar is a console exe; without this Windows pops a blank console
+    // window on every launch (looks like a stray terminal). Piped stdio still works.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
     let mut child = match command.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
         Ok(child) => child,
         Err(err) => {
