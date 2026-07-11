@@ -32,10 +32,11 @@ def audio_preflight(audio_path: str) -> dict[str, Any]:
     if not path.is_file():
         return {"ok": False, "usable": False, "reason": f"找不到音檔：{path.as_posix()}"}
 
-    ffprobe = shutil.which("ffprobe")
-    ffmpeg = shutil.which("ffmpeg")
+    import ffmpeg_runtime
+    ffprobe = ffmpeg_runtime.resolve("ffprobe")
+    ffmpeg = ffmpeg_runtime.resolve("ffmpeg")
     if not ffprobe or not ffmpeg:
-        return {"ok": False, "usable": False, "reason": "ffmpeg/ffprobe 不可用，無法檢查音檔"}
+        return {"ok": False, "usable": False, "reason": "ffmpeg/ffprobe 尚未就緒（請先下載媒體工具）"}
 
     probe = _run(
         [ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", path.as_posix()],

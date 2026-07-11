@@ -38,6 +38,10 @@ class ProductionExtractorError(RuntimeError):
 
 
 def _resolve_binary(name: str) -> str:
+    if name in ("ffmpeg", "ffprobe"):
+        import ffmpeg_runtime
+
+        return ffmpeg_runtime.resolve(name)
     path_command = shutil.which(name)
     if path_command:
         return path_command
@@ -127,6 +131,7 @@ def _ydl_extract(url: str, fmt: str) -> Dict[str, Any]:
     opts = {
         "quiet": True,
         "no_warnings": True,
+        "noprogress": True,
         "skip_download": True,
         "noplaylist": True,
         "format": fmt,
@@ -147,16 +152,31 @@ def _metadata(url: str) -> Dict[str, Any]:
     }
 
 
-def _stream_url(url: str) -> str:
-    fmt = "bestvideo[height<=720][ext=mp4]/best[height<=720][ext=mp4]/bestvideo[height<=720]/best"
-    info = _ydl_extract(url, fmt)
-    stream = info.get("url") or ""
-    if not stream:
-        formats = info.get("requested_formats") or []
-        stream = (formats[0].get("url") if formats else "") or ""
-    if not stream:
-        raise ProductionExtractorError(502, "yt-dlp did not return a media stream URL")
-    return stream
+def _download_lowres_video(url: str, dest_dir: Path) -> str:
+    """Download a low-res copy locally via yt-dlp (it handles the network / TLS /
+    nsig). Frame grabs then read this local file — a downloaded static ffmpeg can
+    segfault on remote https streams, but reads local files reliably. Low res keeps
+    the download light; it's still readable for hard-subtitle OCR."""
+    from yt_dlp import YoutubeDL
+
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noprogress": True,
+        "noplaylist": True,
+        "format": "bestvideo[height<=480][ext=mp4]/best[height<=480][ext=mp4]/worst[ext=mp4]/worst",
+        "outtmpl": str(dest_dir / "video.%(ext)s"),
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+    }
+    with YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+    path = Path(ydl.prepare_filename(info)) if info else None
+    if not path or not path.is_file():
+        found = sorted(dest_dir.glob("video.*"))
+        path = found[0] if found else None
+    if not path or not path.is_file():
+        raise ProductionExtractorError(502, "yt-dlp 未能下載影片畫面")
+    return str(path)
 
 
 def _probe(ffprobe: str, media_url: str) -> Dict[str, Any]:
@@ -354,23 +374,6 @@ def run_production_extractor(
         raise ProductionExtractorError(502, "video duration unavailable")
     if metadata["duration_seconds"] > CAPS["max_video_duration_seconds_for_frame_probe"]:
         raise ProductionExtractorError(400, f"duration exceeds cap: {metadata['duration_seconds']}")
-    # YouTube stream URLs can intermittently 403 (throttle/expiry/nsig). Re-extract
-    # a fresh URL and re-probe a few times before giving up, so a flaky 403 doesn't
-    # fail the whole OCR run.
-    media_url = ""
-    stream: Dict[str, Any] = {}
-    last_error: ProductionExtractorError | None = None
-    for _ in range(3):
-        try:
-            media_url = _stream_url(target["canonical_url"])
-            stream = _probe(ffprobe, media_url)
-            break
-        except ProductionExtractorError as exc:
-            last_error = exc
-            media_url = ""
-    if not media_url:
-        raise last_error or ProductionExtractorError(502, "could not resolve a playable stream")
-
     frame_records: List[Dict[str, Any]] = []
     provider_evidence: List[Dict[str, Any]] = []
     provider_cache: Dict[str, Dict[str, Any]] = {}
@@ -378,6 +381,8 @@ def run_production_extractor(
     cleanup_verified = False
     tmp_root = tempfile.mkdtemp(prefix="vaultwiki_yt_api_extract_", dir="/tmp")
     try:
+        local_video = _download_lowres_video(target["canonical_url"], Path(tmp_root))
+        stream = _probe(ffprobe, local_video)
         for index, timestamp in enumerate(_timestamps(metadata["duration_seconds"], sample_count), start=1):
             frame_path = Path(tmp_root) / f"frame_{index:02d}.png"
             _run_command(
@@ -390,7 +395,7 @@ def run_production_extractor(
                     "-ss",
                     str(timestamp),
                     "-i",
-                    media_url,
+                    local_video,
                     "-frames:v",
                     "1",
                     "-vf",

@@ -151,7 +151,8 @@ def _local_asr_report_only_probe(
     capped_seconds = min(max(1, int(max_sample_seconds or 30)), 30)
     capped_bytes = min(max(1_000_000, int(max_download_bytes or 10_000_000)), 10_000_000)
     yt_dlp = _resolve_yt_dlp_binary()
-    ffmpeg = shutil.which("ffmpeg") or ""
+    import ffmpeg_runtime
+    ffmpeg = ffmpeg_runtime.resolve("ffmpeg")
     whisper = Path(str(readiness.get("binary", {}).get("path") or root / "tools/whisper.cpp/bin/whisper-cli"))
     model = Path(str(readiness.get("model", {}).get("path") or root / "tools/whisper.cpp/models/ggml-tiny.en.bin"))
     if not yt_dlp:
