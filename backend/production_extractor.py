@@ -297,6 +297,11 @@ def _ocr_text_from_evidence(provider_evidence: List[Dict[str, Any]]) -> str:
         try:
             data = json.loads(match.group(0) if match else raw)
         except (ValueError, TypeError):
+            for line in raw.splitlines():
+                text = line.strip()
+                if text and text not in seen:
+                    seen.add(text)
+                    lines.append(text)
             continue
         for key in ("hard_subtitles", "screen_text"):
             for entry in data.get(key) or []:
@@ -363,6 +368,17 @@ def run_production_extractor(
         raise ProductionExtractorError(400, "; ".join(dry["errors"]))
     if not allow_provider_ocr:
         raise ProductionExtractorError(400, "allow_provider_ocr is required for real production extraction")
+
+    use_local_ocr = not os.getenv("OPENAI_API_KEY", "").strip()
+    local_ocr = None
+    if use_local_ocr:
+        try:
+            from local_ocr import LocalOcrUnavailable, ensure_ready, extract_text
+
+            ensure_ready()
+            local_ocr = extract_text
+        except LocalOcrUnavailable as exc:
+            raise ProductionExtractorError(400, str(exc)) from exc
 
     tools = dry["tooling"]["tools"]
     ffmpeg = tools["ffmpeg"]["path"]
@@ -437,19 +453,30 @@ def run_production_extractor(
             else:
                 if provider_call_count >= max_provider_calls:
                     raise ProductionExtractorError(400, "provider call cap exceeded")
-                report = analyze_frame(
-                    filename=frame_path.name,
-                    image_base64=base64.b64encode(data).decode("ascii"),
-                    image_mime="image/png",
-                    mode="real",
-                    prompt=prompt
-                    or (
-                        "Extract visible hard subtitles, screen text, products, people, brands, and concise visual context. "
-                        "Return compact JSON. Do not infer a full transcript."
-                    ),
-                )
+                if local_ocr:
+                    report = {
+                        "status": "local_completed",
+                        "provider": "local",
+                        "model": "rapidocr-onnxruntime",
+                        "segments": [{"text": local_ocr(data)}],
+                        "provider_call_count": 0,
+                        "usage": {"confidence": "not_available"},
+                    }
+                else:
+                    report = analyze_frame(
+                        filename=frame_path.name,
+                        image_base64=base64.b64encode(data).decode("ascii"),
+                        image_mime="image/png",
+                        mode="real",
+                        prompt=prompt
+                        or (
+                            "Extract visible hard subtitles, screen text, products, people, brands, and concise visual context. "
+                            "Return compact JSON. Do not infer a full transcript."
+                        ),
+                    )
                 provider_call_count += int(report.get("provider_call_count") or 0)
                 text = "\n".join(str(segment.get("text") or "") for segment in report.get("segments", []))
+                provider_name = report.get("provider", "openai")
                 evidence = {
                     "frame_index": index,
                     "requested_timestamp": timestamp,
@@ -459,11 +486,15 @@ def run_production_extractor(
                     "status": report.get("status", "provider_completed"),
                     "provider": report.get("provider", "openai"),
                     "model": report.get("model", model_for_task("ocr_visual", "gpt-5.2")),
-                    "evidence_ref": f"provider:openai:ocr_visual:production_frame_{index}",
+                    "evidence_ref": f"provider:{provider_name}:ocr_visual:production_frame_{index}",
                     "text": text[:2000],
                     "text_truncated": len(text) > 2000,
                     "usage": report.get("usage", {}),
-                    "warnings": ["report_only_provider_ocr_requires_operator_review"],
+                    "warnings": [
+                        "report_only_local_ocr_requires_operator_review"
+                        if provider_name == "local"
+                        else "report_only_provider_ocr_requires_operator_review"
+                    ],
                 }
                 provider_cache[sha256] = evidence
                 provider_evidence.append(evidence)
@@ -500,8 +531,8 @@ def run_production_extractor(
         "cleanup_verified": cleanup_verified,
         "lane": "ocr_visual",
         "provider_task": "ocr_visual",
-        "provider": "openai",
-        "provider_model": model_for_task("ocr_visual", "gpt-5.2"),
+        "provider": "local" if use_local_ocr else "openai",
+        "provider_model": "rapidocr-onnxruntime" if use_local_ocr else model_for_task("ocr_visual", "gpt-5.2"),
         "provider_call_count": provider_call_count,
         "provider_evidence_count": len(provider_evidence),
         "provider_evidence": provider_evidence,

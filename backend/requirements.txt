@@ -11,6 +11,7 @@ google-genai==2.8.0
 opencc-python-reimplemented==0.1.7
 trafilatura==2.1.0
 markitdown[pdf]==0.1.6
+rapidocr-onnxruntime==1.3.24
 
 # 可選：掃描型（無文字層）PDF 的本地 OCR。沒裝時 app 照常運作，掃描 PDF 會回
 # 「需裝 OCR」提示而非靜默。要啟用：pip install rapidocr-onnxruntime PyMuPDF

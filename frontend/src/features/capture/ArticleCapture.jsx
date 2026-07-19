@@ -82,6 +82,7 @@ export default function ArticleCapture({ settings, adoptUrl = '' }) {
   }
 
   function save() {
+    if (busy) return setStatus({ type: 'info', message: '草稿或正文仍在處理中，完成後才能存入筆記。' })
     if (!hasUrl) return setStatus({ type: 'error', message: '文章網址必填（作為去重依據）' })
     if (!draft.title.trim()) return setStatus({ type: 'error', message: '標題必填' })
     if (article?.existing && !updateAsk) { setUpdateAsk(true); return }
@@ -177,7 +178,7 @@ export default function ArticleCapture({ settings, adoptUrl = '' }) {
             )}
             <div className="row end">
               <button className="ghost" onClick={() => setDraft(emptyDraft())}>保留正文，清空草稿</button>
-              <button className="primary gated-action" onClick={save} disabled={busy === 'save'}><Save size={16} />{busy === 'save' ? '存入中…' : '存入筆記'}</button>
+              <button className="primary gated-action" onClick={save} disabled={busy !== ''}><Save size={16} />{busy === 'save' ? '存入中…' : '存入筆記'}</button>
             </div>
           </section>
         </div>

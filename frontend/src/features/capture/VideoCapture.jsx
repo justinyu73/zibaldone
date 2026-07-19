@@ -129,10 +129,10 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
     } finally { setBusy('') }
   }
 
-  // OCR（rung 3）：無字幕且畫面有硬字幕時，讀 6 幀畫面文字。需雲端 provider。
+  // OCR（rung 3）：無字幕且畫面有硬字幕時，讀 6 幀畫面文字。本機優先；有 key 時才用雲端視覺 OCR。
   async function runVideoOcr() {
     if (!extractVideoId(url)) return setStatus({ type: 'error', message: '請先輸入有效 URL' })
-    setBusy('ocr'); setStatus({ type: 'info', message: '讀取影片畫面硬字幕（OCR，需雲端 provider）...' })
+    setBusy('ocr'); setStatus({ type: 'info', message: '讀取影片畫面硬字幕（本機 OCR；有 API key 時可用雲端視覺 OCR）...' })
     try {
       const data = await postJson('/production-extractor', {
         url, mode: 'real', user_authorized_media: true, allow_provider_ocr: true, confirm_report_only: true,
@@ -140,7 +140,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
       const text = (data.ocr_text || '').trim()
       if (!text) throw new Error('OCR 未取得可用文字（此來源畫面可能無硬字幕）')
       setEnText(text); setLang('en')
-      setStatus({ type: 'ok', message: '已用畫面 OCR 產生文字，可校正後生成草稿。' })
+      setStatus({ type: 'ok', message: `已用${data.provider === 'local' ? '本機' : '雲端'}畫面 OCR 產生文字，可校正後生成草稿。` })
     } catch (error) {
       setStatus({ type: 'error', message: `OCR 失敗：${error.message}` })
     } finally { setBusy('') }
@@ -185,6 +185,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
 
   // 存入前的安全閘：已存在 → 先問是否覆寫，不直接蓋掉。
   function save() {
+    if (busy) return setStatus({ type: 'info', message: '草稿或來源仍在處理中，完成後才能存入筆記。' })
     if (!fetched) return setStatus({ type: 'error', message: '請先抓取字幕' })
     if (fetched.existing) { setOverwriteAsk(true); return }
     doSave('create')
@@ -332,7 +333,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
             )}
             <div className="row end">
               <button className="ghost" onClick={() => setDraft(emptyDraft())}>保留來源，清空草稿</button>
-              <button className="primary gated-action" onClick={save} disabled={busy === 'save' || !fetched}><Save size={16} />{busy === 'save' ? '存入中...' : '存入筆記'}</button>
+      <button className="primary gated-action" onClick={save} disabled={busy !== '' || !fetched}><Save size={16} />{busy === 'save' ? '存入中...' : '存入筆記'}</button>
             </div>
           </section>
         </div>
