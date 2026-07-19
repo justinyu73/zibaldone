@@ -16,7 +16,11 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       // ws:true 讓即時擷取 Half-2 的 WS（/api/app/realtime-asr）在 dev 也能升級
-      '/api': { target: `http://127.0.0.1:${backendPort}`, ws: true },
+      '/api': {
+        target: `http://127.0.0.1:${backendPort}`,
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })
