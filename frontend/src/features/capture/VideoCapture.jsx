@@ -8,7 +8,7 @@ import { apiFetch, postJson } from '../../app/api'
 import StatusMessage from '../../components/status/StatusMessage'
 import SummaryModelPicker from '../../components/model/SummaryModelPicker'
 import NoteFields from '../../components/note/NoteFields'
-import { draftFromSummary, draftToAiSummary, emptyDraft, extractVideoId } from '../../app/noteDraft'
+import { draftFromSource, draftFromSummary, draftToAiSummary, emptyDraft, extractVideoId } from '../../app/noteDraft'
 
 export default function VideoCapture({ settings, adoptUrl = '' }) {
   const paths = deriveVaultPaths(settings.vaultRoot)
@@ -139,14 +139,23 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
       })
       const text = (data.ocr_text || '').trim()
       if (!text) throw new Error('OCR 未取得可用文字（此來源畫面可能無硬字幕）')
-      setEnText(text); setLang('en')
+      // OCR has no subtitle-language metadata. Preserve the evidence in the
+      // original field, and mirror CJK output into the Chinese review field so
+      // Chinese hard subtitles do not trigger a needless translation call.
+      const isCjk = /[\u3400-\u9fff]/.test(text)
+      setEnText(text); setZhText(isCjk ? text : ''); setLang(isCjk ? 'zh' : 'en')
       setStatus({ type: 'ok', message: `已用${data.provider === 'local' ? '本機' : '雲端'}畫面 OCR 產生文字，可校正後生成草稿。` })
     } catch (error) {
       setStatus({ type: 'error', message: `OCR 失敗：${error.message}` })
     } finally { setBusy('') }
   }
 
-  // ③ 生成草稿 — 需要時先翻譯字幕為中文（貼入中文區塊），再付費 AI 摘要。
+  function isMissingAiRoute(error) {
+    return /內建本機 AI 尚未安裝|API 金鑰未設定|訂閱 CLI（[^）]+）未安裝/.test(error?.message || '')
+  }
+
+  // ③ 生成草稿 — 需要時先翻譯字幕為中文，再摘要；沒有可用 AI 時仍
+  // 建立可編輯的證據草稿，避免「本次跳過下載」變成整條收錄流程死路。
   async function generateDraft() {
     if (!(enText || zhText)) return setStatus({ type: 'error', message: '請先「抓取字幕」' })
     setBusy('draft')
@@ -169,15 +178,29 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
         try {
           const t = await postJson('/translate', { text: enText, target: 'zh-TW', progress_id: progressId })
           zh = t.translated || ''
+        } catch (error) {
+          if (!isMissingAiRoute(error)) throw error
+          // A configured summary model may still be able to translate from the
+          // original transcript, so continue to /summarize with zh empty.
+          setStatus({ type: 'info', message: '翻譯模型尚未就緒，先以原文嘗試生成草稿...' })
         } finally { clearInterval(poll) }
-        setZhText(zh); setLang('zh')
+        if (zh) { setZhText(zh); setLang('zh') }
       }
-      setStatus({ type: 'info', message: 'AI 摘要生成中...' })
-      const data = await postJson('/summarize', {
-        title: fetched?.meta?.title || '', transcript_en: enText, transcript_zh: zh, mode, source_url: fetched?.url || url,
-      })
-      setDraft(draftFromSummary(data.summary || {}, fetched?.meta?.title || ''))
-      setStatus({ type: 'ok', message: didTranslate ? '已翻譯中文字幕並生成草稿，可編輯後存入。' : '草稿已生成，可編輯後存入。' })
+      try {
+        setStatus({ type: 'info', message: 'AI 摘要生成中...' })
+        const data = await postJson('/summarize', {
+          title: fetched?.meta?.title || '', transcript_en: enText, transcript_zh: zh, mode, source_url: fetched?.url || url,
+        })
+        setDraft(draftFromSummary(data.summary || {}, fetched?.meta?.title || ''))
+        setStatus({ type: 'ok', message: didTranslate && zh ? '已翻譯中文字幕並生成草稿，可編輯後存入。' : '草稿已生成，可編輯後存入。' })
+      } catch (error) {
+        if (!isMissingAiRoute(error)) throw error
+        setDraft(draftFromSource(zh || enText, fetched?.meta?.title || '', 'YT'))
+        setStatus({
+          type: 'ok',
+          message: '已建立待人工整理草稿；若要 AI 翻譯與摘要，請到設定下載內建本機 AI，或填入對應 API 金鑰。',
+        })
+      }
     } catch (error) {
       setStatus({ type: 'error', message: error.message })
     } finally { setBusy('') }
