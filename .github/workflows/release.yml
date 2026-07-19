@@ -1,0 +1,161 @@
+name: release
+
+# Tag push (v*) → signed desktop builds → GitHub Release with updater assets.
+# The app's in-app updater fetches latest.json + bundles from these private
+# release assets using the user's read-only token (stored locally on each machine).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  # 發版 gate（JY commercial review P0）：tag 觸發後先跑整套 CI（backend/frontend/e2e），
+  # 全綠才往下 build/release。重用 ci.yml（workflow_call）＝單一真相，不複製。紅色 commit 打 tag 也不會發版。
+  gate:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            sep: ';'
+            ext: '.exe'
+            bundles: nsis # updater-compatible installer
+          - os: macos-latest
+            sep: ':'
+            ext: ''
+            bundles: app,dmg # app target emits the updater .app.tar.gz; dmg for fresh installs
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri
+      - name: test Rust sidecar lifecycle
+        run: cargo test --lib --locked
+        working-directory: frontend/src-tauri
+        env:
+          TAURI_CONFIG: '{"bundle":{"externalBin":[]}}'
+      - run: pip install -r backend/requirements.txt pyinstaller
+      - name: build sidecar (PyInstaller --onedir, per-OS)
+        shell: bash
+        # --onedir (not --onefile): ship the exe + _internal/ tree so each launch
+        # skips the onefile bootloader's ~200MB self-extraction into a temp dir.
+        # That extraction was the dominant sidecar cold-start cost.
+        run: |
+          cd backend
+          pyinstaller --onedir --name video-intake-fastapi-sidecar \
+            --add-data "enabled_models.json${{ matrix.sep }}." \
+            --collect-submodules uvicorn --collect-submodules anyio \
+            --collect-data trafilatura --collect-data justext --collect-data tld --collect-data certifi \
+            --collect-submodules anthropic --collect-submodules google.genai \
+            --collect-submodules yt_dlp --copy-metadata yt-dlp \
+            --copy-metadata anthropic --copy-metadata google-genai \
+            --hidden-import uvicorn.logging --hidden-import uvicorn.loops.auto \
+            --hidden-import uvicorn.protocols.http.auto \
+            --hidden-import uvicorn.protocols.websockets.auto --hidden-import uvicorn.lifespan.on \
+            sidecar_main.py
+          # onedir is a folder (exe + _internal/); bundle it whole as a Tauri
+          # resource. No target-triple suffix needed — resources are referenced by
+          # relative path, not resolved per host triple like externalBin.
+          rm -rf ../frontend/src-tauri/binaries/video-intake-fastapi-sidecar
+          mkdir -p ../frontend/src-tauri/binaries
+          cp -R dist/video-intake-fastapi-sidecar \
+             ../frontend/src-tauri/binaries/video-intake-fastapi-sidecar
+      - run: npm ci
+        working-directory: frontend
+      - name: tauri build (signed)
+        # Release override: drop the dev externalBin and bundle the onedir tree as a
+        # resource under Resources/sidecar/ (matches SIDECAR_RESOURCE_DIR in lib.rs).
+        run: npx tauri build --bundles ${{ matrix.bundles }} --config '{"bundle":{"externalBin":[],"resources":{"binaries/video-intake-fastapi-sidecar":"sidecar"}}}'
+        working-directory: frontend
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      - name: enforce release size budget
+        run: python3 scripts/product_readiness_check.py --artifacts frontend/src-tauri/target/release/bundle
+      - name: upload release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release create "$TAG" --title "$TAG" --notes "自動發版（見 commit 紀錄）" 2>/dev/null || true
+          shopt -s nullglob
+          cd frontend/src-tauri/target/release/bundle
+          FILES=( dmg/*.dmg macos/*.app.tar.gz macos/*.app.tar.gz.sig nsis/*.exe nsis/*.exe.sig )
+          gh release upload "$TAG" "${FILES[@]}" --clobber
+
+  latest-json:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: assemble latest.json (asset API urls + signatures)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 - << 'PY'
+          import datetime, json, os, subprocess, time
+
+          repo = os.environ['GH_REPO']
+          tag = os.environ['GITHUB_REF_NAME']
+
+          def fetch_assets():
+              rel = json.loads(subprocess.check_output(['gh', 'api', f'repos/{repo}/releases/tags/{tag}']))
+              return rel, {a['name']: a for a in rel['assets']}
+
+          def have_updater_assets(names):
+              mac = any(n.endswith('.app.tar.gz') for n in names) and any(n.endswith('.app.tar.gz.sig') for n in names)
+              win = any(n.endswith('.exe') and not n.endswith('.sig') for n in names) and any(n.endswith('.exe.sig') for n in names)
+              return mac and win
+
+          # GitHub releases API is read-after-write eventually-consistent; just-uploaded
+          # assets may not appear yet → wait so next()/sig_text don't fail the job.
+          for _ in range(12):
+              rel, assets = fetch_assets()
+              if have_updater_assets(assets):
+                  break
+              time.sleep(10)
+          else:
+              raise SystemExit('updater assets not all present after waiting ~2min')
+
+          def sig_text(name):
+              return subprocess.check_output(
+                  ['gh', 'api', '-H', 'Accept: application/octet-stream',
+                   f"repos/{repo}/releases/assets/{assets[name]['id']}"]).decode().strip()
+
+          def asset_url(name):
+              return f"https://api.github.com/repos/{repo}/releases/assets/{assets[name]['id']}"
+
+          mac = next(n for n in assets if n.endswith('.app.tar.gz'))
+          win = next(n for n in assets if n.endswith('.exe') and not n.endswith('.sig'))
+          out = {
+              'version': tag.lstrip('v'),
+              'notes': rel.get('body') or '',
+              'pub_date': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+              'platforms': {
+                  'darwin-aarch64': {'signature': sig_text(mac + '.sig'), 'url': asset_url(mac)},
+                  'windows-x86_64': {'signature': sig_text(win + '.sig'), 'url': asset_url(win)},
+              },
+          }
+          with open('latest.json', 'w') as fh:
+              json.dump(out, fh, indent=1)
+          print(json.dumps({k: v for k, v in out.items() if k != 'platforms'}))
+          PY
+          gh release upload "${GITHUB_REF_NAME}" latest.json --clobber

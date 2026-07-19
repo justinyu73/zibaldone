@@ -1,0 +1,71 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Zibaldone",
+  "version": "0.8.2",
+  "identifier": "io.github.justinyu73.zibaldone",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "知識筆記",
+        "width": 1240,
+        "height": 840,
+        "minWidth": 980,
+        "minHeight": 680,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://img.youtube.com https://i.ytimg.com https://*.ytimg.com http://127.0.0.1:*; media-src 'self' http://127.0.0.1:*; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* https://api.github.com; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "Zibaldone",
+    "homepage": "https://github.com/justinyu73/zibaldone",
+    "category": "Productivity",
+    "shortDescription": "本機優先的影片、文章與會議筆記收錄工具",
+    "longDescription": "將使用者授權的影片字幕、文章與會議音檔整理成可校正、可搜尋的 Markdown 筆記。",
+    "externalBin": [
+      "binaries/video-intake-fastapi-sidecar-dev"
+    ],
+    "windows": {
+      "allowDowngrades": false,
+      "nsis": {
+        "installerHooks": "installer-hooks.nsh",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "installMode": "currentUser",
+        "languages": ["TradChinese", "English"],
+        "displayLanguageSelector": false,
+        "startMenuFolder": "YT Note App"
+      }
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc0MDlFQ0ZGODlFN0NENkMKUldSc3plZUovK3dKZE9qSjExVGUvZW5GZHBITi9nb01COVVseWVka3A1WHdBdWNkV0hMaWVvRHkK",
+      "endpoints": [
+        "https://api.github.com/repos/justinyu73/zibaldone/releases/latest"
+      ]
+    }
+  }
+}

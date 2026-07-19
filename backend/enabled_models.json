@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "provider": "openai",
+  "runtime_boundary": {
+    "provider_execution": "approved_for_operator_supplied_media",
+    "media_access": "operator_supplied_media_only_no_platform_download",
+    "credentials": "OPENAI_API_KEY_required_for_real_calls",
+    "durable_write": "disabled_by_default_report_only"
+  },
+  "defaults": {
+    "translate": "llamacpp:gemma-3-4b-it",
+    "summary": "gpt-5.2",
+    "asr": "whisper-1",
+    "asr_bulk": "gpt-4o-mini-transcribe",
+    "asr_diarize": "gpt-4o-transcribe-diarize",
+    "ocr_visual": "gpt-5.2",
+    "fusion_research": "gpt-5.2",
+    "draft_bulk": "gpt-5-mini"
+  },
+  "tasks": {
+    "translate": {
+      "enabled": true,
+      "model": "llamacpp:gemma-3-4b-it",
+      "fallbacks": ["gpt-5-mini"],
+      "env": "OPENAI_TRANSLATE_MODEL",
+      "endpoint": "responses_or_chat"
+    },
+    "summary": {
+      "enabled": true,
+      "model": "gpt-5.2",
+      "env": "OPENAI_SUMMARY_MODEL",
+      "endpoint": "responses_or_chat"
+    },
+    "asr": {
+      "enabled": true,
+      "model": "whisper-1",
+      "env": "OPENAI_ASR_MODEL",
+      "endpoint": "audio.transcriptions",
+      "input_boundary": "operator_supplied_audio_base64_only",
+      "note": "whisper-1：唯一支援 verbose_json/segment 時間戳的 OpenAI ASR（高品質 tier 保住 quote+timestamp distill）。gpt-4o-transcribe 文字略準但不回時間戳。"
+    },
+    "asr_bulk": {
+      "enabled": true,
+      "model": "gpt-4o-mini-transcribe",
+      "env": "OPENAI_ASR_BULK_MODEL",
+      "endpoint": "audio.transcriptions",
+      "input_boundary": "operator_supplied_audio_base64_only"
+    },
+    "asr_diarize": {
+      "enabled": true,
+      "model": "gpt-4o-transcribe-diarize",
+      "env": "OPENAI_ASR_DIARIZE_MODEL",
+      "endpoint": "audio.transcriptions",
+      "input_boundary": "operator_supplied_audio_base64_only"
+    },
+    "ocr_visual": {
+      "enabled": true,
+      "model": "gpt-5.2",
+      "env": "OPENAI_OCR_VISUAL_MODEL",
+      "endpoint": "responses",
+      "input_boundary": "operator_supplied_frame_base64_only"
+    },
+    "fusion_research": {
+      "enabled": true,
+      "model": "gpt-5.2",
+      "env": "OPENAI_FUSION_RESEARCH_MODEL",
+      "endpoint": "responses_or_chat",
+      "input_boundary": "validated evidence contract only"
+    },
+    "draft_bulk": {
+      "enabled": true,
+      "model": "gpt-5-mini",
+      "env": "OPENAI_DRAFT_BULK_MODEL",
+      "endpoint": "responses_or_chat"
+    }
+  }
+}
