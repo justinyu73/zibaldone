@@ -31,6 +31,31 @@ export function draftFromSummary(summary, title) {
   }
 }
 
+// No-AI fallback: keep the capture lane usable when the user intentionally
+// skipped the optional local model download and has not configured a cloud key.
+// This is an editable evidence draft, not an AI-generated summary.
+export function draftFromSource(text, title, sourcePlatform = 'YT') {
+  const compact = str(text).replace(/\s+/g, ' ').trim()
+  const fragments = str(text)
+    .split(/\n+|(?<=[。！？.!?])/u)
+    .map((part) => part.replace(/^[-*•\s]+/, '').trim())
+    .filter(Boolean)
+    .slice(0, 3)
+  const preview = compact.length > 160 ? `${compact.slice(0, 160)}…` : compact
+  const points = fragments.length
+    ? fragments.map((part) => `- ${part}`).join('\n')
+    : '待人工整理（原文已保留於上方審查區）'
+  return {
+    ...emptyDraft(),
+    title: title || '',
+    explicit_topic: preview ? `待人工整理：${preview}` : '待人工整理',
+    key_points: points,
+    content_value: '來源文字已取得；尚未使用 AI 摘要，請人工確認主題、重點與可應用價值。',
+    source_platform: sourcePlatform,
+    content_category: '待分類',
+  }
+}
+
 export function extractVideoId(url) {
   const value = String(url || '').trim()
   if (/^[A-Za-z0-9_-]{11}$/.test(value)) return value

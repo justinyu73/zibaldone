@@ -116,13 +116,20 @@ installed. Neither ships in the installer (which keeps the release budget — wa
 95 MB / fail 110 MB — CI-enforced); once installed, `llamacpp:gemma-3-4b-it` is the
 default `translate` model, with cloud as the configured fallback.
 
+The capture lane remains usable when the operator intentionally skips that
+optional download and has no cloud key: Chinese OCR is treated as already
+translated, and an unavailable translation/summary route produces an editable
+**evidence draft** from the captured text. It is labelled as pending manual
+review, never presented as AI output, and still requires the normal human review
+gate before a note is written.
+
 ## Testing as architecture
 
 - **Surface contract**: all 76 endpoint method/path pairs are pinned in one test.
   Router refactors (this codebase was split from a 3,700-line `main.py` in six
   verbatim-move batches) can't silently change the API.
-- **Layers**: 320+ backend unit tests (no network, providers mocked), 47 frontend
-  unit tests, 21 Playwright E2E cases against a real spawned backend, Rust
+- **Layers**: 320+ backend unit tests (no network, providers mocked), 48 frontend
+  unit tests, 27 Playwright E2E cases against a real spawned backend, Rust
   lifecycle tests, plus a product-readiness check (tracked-tree size, forbidden
   paths, artifact budget) that runs in CI and at release.
 - **Release gating**: a `v*` tag runs the full CI suite before any packaging job;
