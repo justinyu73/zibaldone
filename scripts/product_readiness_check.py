@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic source/release checks for the private product-ready baseline."""
+"""Deterministic source/release checks for the public product-ready baseline."""
 
 from __future__ import annotations
 
@@ -39,8 +39,13 @@ FORBIDDEN_TRACKED_NAMES = {
     "config.json",
 }
 ARTIFACT_SUFFIXES = (".dmg", ".exe", ".app.tar.gz")
-WARN_ARTIFACT_BYTES = 95_000_000
-MAX_ARTIFACT_BYTES = 110_000_000
+# Windows NSIS is kept at the original 110 MB hard cap. macOS bundles include
+# the same onedir Python sidecar but compress materially less efficiently, so
+# their measured release artifacts need a separate, still bounded budget.
+WARN_WINDOWS_ARTIFACT_BYTES = 95_000_000
+MAX_WINDOWS_ARTIFACT_BYTES = 110_000_000
+WARN_MACOS_ARTIFACT_BYTES = 160_000_000
+MAX_MACOS_ARTIFACT_BYTES = 200_000_000
 MAX_TRACKED_SOURCE_BYTES = 25_000_000
 
 
@@ -109,16 +114,23 @@ def artifact_checks(path: Path) -> tuple[list[str], list[str], dict[str, object]
     rows: list[dict[str, object]] = []
     for artifact in artifacts:
         size = artifact.stat().st_size
+        is_windows = artifact.name.endswith(".exe")
+        warn_limit = (
+            WARN_WINDOWS_ARTIFACT_BYTES if is_windows else WARN_MACOS_ARTIFACT_BYTES
+        )
+        max_limit = (
+            MAX_WINDOWS_ARTIFACT_BYTES if is_windows else MAX_MACOS_ARTIFACT_BYTES
+        )
         rows.append({"name": artifact.name, "bytes": size})
-        if size > MAX_ARTIFACT_BYTES:
+        if size > max_limit:
             errors.append(
                 f"{artifact.name} is {size / 1_000_000:.1f} MB "
-                f"(hard limit {MAX_ARTIFACT_BYTES / 1_000_000:.0f} MB)"
+                f"(hard limit {max_limit / 1_000_000:.0f} MB)"
             )
-        elif size > WARN_ARTIFACT_BYTES:
+        elif size > warn_limit:
             warnings.append(
                 f"{artifact.name} is {size / 1_000_000:.1f} MB "
-                f"(warning threshold {WARN_ARTIFACT_BYTES / 1_000_000:.0f} MB)"
+                f"(warning threshold {warn_limit / 1_000_000:.0f} MB)"
             )
     return errors, warnings, {"artifacts": rows}
 
