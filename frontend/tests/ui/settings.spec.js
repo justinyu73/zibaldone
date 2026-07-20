@@ -11,7 +11,13 @@ test('settings explains why subscription CLI models are hidden', async ({ page }
     await expect(runtime.locator('.cli-model-notice')).toContainText('目前未啟用')
     await expect(runtime.locator('.cli-model-notice')).toContainText('CLI 不會出現在上方的翻譯／摘要模型清單')
     await expect(runtime.getByRole('checkbox', { name: '顯示訂閱 CLI 模型' })).toBeVisible()
-    await expect(runtime.locator('.settings-toggle')).toContainText('勾選後按「儲存模型/上限」')
+    await expect(runtime.locator('.settings-toggle')).toContainText('勾選後一定要按「儲存模型/上限」')
+
+    await runtime.getByRole('checkbox', { name: '顯示訂閱 CLI 模型' }).check()
+    await expect(runtime.locator('.cli-model-notice')).toContainText('設定尚未儲存：CLI 尚未生效')
+    await expect(runtime.locator('.cli-model-notice')).toContainText('請按下方「儲存模型/上限」')
+    await expect(runtime.locator('.settings-toggle')).toContainText('已變更但尚未生效')
+    await expect(runtime.getByRole('button', { name: '儲存模型/上限' })).toBeVisible()
   } finally {
     fixture.cleanup()
   }

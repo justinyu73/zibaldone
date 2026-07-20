@@ -1,8 +1,7 @@
 name: release
 
-# Tag push (v*) → signed desktop builds → GitHub Release with updater assets.
-# The app's in-app updater fetches latest.json + bundles from these private
-# release assets using the user's read-only token (stored locally on each machine).
+# Tag push (v*) → CI-gated desktop builds → public GitHub Release with updater assets.
+# The app's in-app updater reads latest.json from the public release assets.
 on:
   push:
     tags: ['v*']
@@ -95,11 +94,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          gh release create "$TAG" --title "$TAG" --notes "自動發版（見 commit 紀錄）" 2>/dev/null || true
+          NOTES_FILE="docs/releases/${TAG#v}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            gh release create "$TAG" --title "Zibaldone $TAG" --notes-file "$NOTES_FILE" 2>/dev/null || true
+          else
+            gh release create "$TAG" --title "Zibaldone $TAG" --generate-notes 2>/dev/null || true
+          fi
           shopt -s nullglob
           cd frontend/src-tauri/target/release/bundle
           FILES=( dmg/*.dmg macos/*.app.tar.gz macos/*.app.tar.gz.sig nsis/*.exe nsis/*.exe.sig )
           gh release upload "$TAG" "${FILES[@]}" --clobber
+          CHECKSUM_FILE="$RUNNER_TEMP/SHA256SUMS-${{ matrix.os }}.txt"
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${FILES[@]}" > "$CHECKSUM_FILE"
+          else
+            shasum -a 256 "${FILES[@]}" > "$CHECKSUM_FILE"
+          fi
+          gh release upload "$TAG" "$CHECKSUM_FILE" --clobber
 
   latest-json:
     needs: build

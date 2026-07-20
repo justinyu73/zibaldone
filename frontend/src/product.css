@@ -336,6 +336,7 @@ button.ts-seek:hover { background: var(--brand); color: #fff; }
 .state-chip.neutral { color: var(--neutral-ink); background: var(--neutral-bg); border-color: var(--neutral-line); }
 .state-chip.info { color: var(--info-ink); background: var(--info-bg); border-color: var(--info-line); }
 .state-chip.ok { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-line); }
+.state-chip.warn { color: var(--warn-ink); background: var(--warn-bg); border-color: var(--warn-line); }
 .state-chip.error { color: var(--err-ink); background: var(--err-bg); border-color: var(--err-line); }
 .workbench-alert { width: 100%; }
 
@@ -544,6 +545,7 @@ button.ts-seek:hover { background: var(--brand); color: #fff; }
 .settings-state.ok { background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-line); }
 .settings-state.info { background: var(--info-bg); color: var(--info-ink); border-color: var(--info-line); }
 .settings-state.neutral { background: var(--neutral-bg); color: var(--neutral-ink); border-color: var(--neutral-line); }
+.settings-state.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
 .settings-state.error { background: var(--err-bg); color: var(--err-ink); border-color: var(--err-line); }
 .settings-note code { font-size: 12px; }
 .cli-model-notice strong { display: block; margin-bottom: 2px; }

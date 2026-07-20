@@ -1,60 +1,47 @@
-# macOS installation
+# macOS Apple Silicon 安裝
 
-Supported release: Apple Silicon (`aarch64`). Intel Mac is not currently a
-published target.
+目前公開安裝檔支援 Apple Silicon（`aarch64`）。Intel Mac 目前沒有公開 DMG。
 
-## Fresh install
+## 下載與安裝
 
-1. Open the latest GitHub Release.
-2. Download `Video.Intake.App_<version>_aarch64.dmg`.
-3. Open the DMG and drag **Video Intake App** to **Applications**.
-4. Open the app from Applications.
-5. First launch shows **"Video Intake App" 已損毀，無法打開** — this is
-   Gatekeeper's wording for a quarantined app without Apple notarization, not
-   actual corruption (verified in practice 2026-07-05: Control-click Open and
-   Privacy & Security "Open Anyway" do NOT clear this variant). After confirming
-   the DMG came from this project's GitHub Release, remove the quarantine flag
-   for this app only:
+1. 開啟 [GitHub Releases](https://github.com/justinyu73/zibaldone/releases) 的目標版本。
+2. 下載 `Zibaldone_<版本>_aarch64.dmg`，不要下載 `.sig` 或 `latest.json` 當安裝程式。
+3. （建議）先用 Release 內的 `SHA256SUMS-macos-latest.txt` 核對 DMG。
+4. 開啟 DMG，把 **Zibaldone.app** 拖到 **Applications**。
+5. 第一次開啟前，先閱讀下方 Gatekeeper 說明，再完成首次設定。
 
-   ```bash
-   xattr -r -d com.apple.quarantine "/Applications/Video Intake App.app"
-   ```
+## Gatekeeper 風險說明
 
-6. Open the app and complete the in-app first-run setup.
+本專案目前沒有 Apple Developer ID signing 或 notarization。即使 DMG 沒有被
+竄改，macOS 仍可能顯示「Zibaldone 已損毀，無法打開」；這是未 notarize app 的
+常見 Gatekeeper 措辭，不代表一定是檔案損壞。
 
-The updater artifact has the project's Tauri updater signature. The app has no
-Apple Developer ID signing or notarization, so Gatekeeper flags the first
-install; in-app updates afterwards are unaffected. The permanent fix is Apple
-Developer Program signing + notarization in `release.yml` (Tauri supports it
-natively via `APPLE_CERTIFICATE`/`APPLE_ID` secrets) — pending a paid Apple
-Developer account. Keep the `xattr` command scoped to this app path; do not
-run blanket quarantine removal.
+只有在你已確認來源與 SHA-256 都正確後，對**這個 App 的固定路徑**移除隔離標記：
 
-## First run
+```bash
+xattr -r -d com.apple.quarantine "/Applications/Zibaldone.app"
+```
 
-- Grant access only to the note vault and media files intentionally selected.
-- Start with the free/local route. Provider API keys are optional.
-- Confirm the Settings page shows the backend as connected.
-- Use preview before the first real note write.
+接著從 Applications 開啟。不要執行 `xattr -r -d com.apple.quarantine /`、對整個
+Downloads／Applications 解除隔離，或為了安裝而停用 Gatekeeper。若指令顯示檔案
+不存在，請先確認 App 名稱與 Applications 路徑；不要改用廣泛的刪除指令。
 
-## Upgrade
+Updater 的下載檔有專案簽章驗證，但這不會取代 Apple notarization；永久消除首次
+提示需要 Apple Developer Program 與 release secrets。
 
-Use **Settings -> Version and updates** for a signed in-app update. For a manual
-upgrade, quit the app, open the new DMG, and replace the app in Applications.
-The selected note vault is external and must remain untouched.
+## 第一次使用
 
-## Uninstall
+- 不需要 WSL、Python 或 Node。
+- 第 4 步的下載項目是內建本機 AI（llama.cpp + Gemma），不是 Ollama，也不是 CLI；
+  可選「跳過，本次不下載」，之後再到設定頁下載。
+- 若要使用已登入的 Claude／Codex／Gemini CLI，勾選後一定要按「儲存模型/上限」。
+- YouTube 無字幕時，ASR/OCR 會在你明確點選後從 YouTube 下載必要的暫存媒體；
+  預設本機 OCR 不會把影片上傳雲端。選用雲端 provider 時，請先確認內容可外傳。
+- 生成草稿後先人工檢查，再按「存入筆記」；沒有設定筆記庫根目錄時不會寫入。
 
-Quit the app and move **Video Intake App** from Applications to Trash.
+## 升級與解除安裝
 
-The external note vault is user data and must not be removed. The local app
-configuration may remain in the user's home directory; remove it manually only
-when intentionally clearing API keys and preferences.
-
-## Acceptance checklist
-
-- DMG opens and the app can be copied to Applications.
-- The first launch reaches the setup flow after the documented Gatekeeper path.
-- First-run setup can finish without an API key.
-- An update preserves settings and the external vault.
-- Removing the app preserves the external vault.
+可在「設定 → 版本與更新」使用簽章 updater，或關閉 App 後從新 DMG 替換
+Applications 內的舊版。解除安裝時把 Zibaldone.app 移到垃圾桶；外部筆記庫、
+音檔與附件不應被刪除。家目錄中的設定、金鑰與模型快取可能保留，需清除時再
+依隱私文件手動處理。

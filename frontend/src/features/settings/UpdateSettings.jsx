@@ -25,7 +25,7 @@ export default function UpdateSettings() {
   }, [])
 
   async function checkUpdate() {
-    // token 選填（S2 公開化）：私有 repo 需 token；公開 repo 匿名即可查 release
+    // token 選填：公開 repo 可匿名查 release；保留欄位供受限環境使用。
     const token = updateToken.trim()
     setUpdate({ state: 'checking', message: '檢查最新版本中…', latest: '', endpoint: '' })
     try {
