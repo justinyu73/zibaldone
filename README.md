@@ -30,7 +30,7 @@ other way around:
   dropped rather than invented.
 - **Honest engineering.** 76 API endpoints locked by a surface-contract test,
   320+ backend tests, 27 Playwright E2E cases, release gated on CI, and a size
-  budget that fails the build past 110 MB.
+  budget that fails Windows artifacts past 110 MB and macOS artifacts past 200 MB.
 
 ## Feature map
 

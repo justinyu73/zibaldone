@@ -112,9 +112,11 @@ Two hard rules learned the expensive way:
 The **built-in runtime** (spec C) is the keyless local path: a pinned llama.cpp
 release (~15 MB) plus a quantized `gemma-3-4b-it` model (~2.4 GB) are downloaded on
 first use with `.part` + atomic-rename semantics — a half-download never looks
-installed. Neither ships in the installer (which keeps the release budget — warn
-95 MB / fail 110 MB — CI-enforced); once installed, `llamacpp:gemma-3-4b-it` is the
-default `translate` model, with cloud as the configured fallback.
+installed. Neither ships in the installer. CI enforces separate desktop budgets:
+Windows warns at 95 MB and fails at 110 MB; macOS warns at 160 MB and fails at
+200 MB because its DMG and updater archive compress the same onedir sidecar less
+efficiently. Once installed, `llamacpp:gemma-3-4b-it` is the default `translate`
+model, with cloud as the configured fallback.
 
 The capture lane remains usable when the operator intentionally skips that
 optional download and has no cloud key: Chinese OCR is treated as already
