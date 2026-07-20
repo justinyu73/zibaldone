@@ -41,12 +41,17 @@ export default function SettingsView({ settings, setSettings, onOpenSetup }) {
   const [keyMsg, setKeyMsg] = useState(null)
   const [cost, setCost] = useState(null)
   const [rt, setRt] = useState(null)
-  const [rtSaved, setRtSaved] = useState(false)
+  // null = 尚未載入基準值；false = 有未儲存變更；true = 最近一次儲存成功。
+  // 這讓設定頁可以在使用者剛勾選 CLI 時，立即說明還要按儲存才會生效。
+  const [rtSaved, setRtSaved] = useState(null)
   const [modelOpts, setModelOpts] = useState(null)
   const setRtField = (k) => (e) => { setRt({ ...rt, [k]: e.target.value }); setRtSaved(false) }
 
   async function refreshCost() { try { setCost(await (await apiFetch(`/app/cost-summary`)).json()) } catch { setCost(null) } }
-  async function refreshRt() { try { setRt(await (await apiFetch(`/app/settings`)).json()) } catch { setRt(null) } }
+  async function refreshRt() {
+    try { setRt(await (await apiFetch(`/app/settings`)).json()); setRtSaved(null) }
+    catch { setRt(null); setRtSaved(null) }
+  }
   async function saveRt() {
     try {
       const body = {

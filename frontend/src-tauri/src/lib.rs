@@ -433,7 +433,7 @@ fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<
 }
 
 
-/// In-app update against the private GitHub repo. The frontend resolves the
+/// In-app update against the public GitHub repo. The frontend resolves the
 /// latest release and passes the latest.json ASSET API url + the user's
 /// read-only token (stored locally, never embedded in the binary); this
 /// command verifies the minisign signature, installs, then restarts.
