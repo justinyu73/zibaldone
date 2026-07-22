@@ -11,6 +11,7 @@ export default function RuntimeSettings({
       .map((option) => [option.id, option]),
   ).values()]
   const cliModelNames = cliModels.map((option) => option.label || option.id.replace(/^cli:/, ''))
+  const cliInventory = modelOptions?.cli_inventory || []
   const cliEnabled = Boolean(runtime?.cli_providers_enabled)
   const hasUnsavedChanges = runtimeSaved === false
 
@@ -47,9 +48,21 @@ export default function RuntimeSettings({
                 : cliEnabled
                 ? (cliModels.length
                   ? `目前可選：${cliModelNames.join('、')}。`
-                  : '已啟用，但尚未偵測到 claude、codex 或 gemini CLI。請確認已安裝並登入。')
+                  : '已啟用，但尚未偵測到 claude、codex 或 gemini CLI。請確認已安裝；登入狀態會在首次呼叫時驗證。')
                 : '未勾選時，CLI 不會出現在上方的翻譯／摘要模型清單；勾選下方開關並按「儲存模型/上限」後才會載入。'}
             </span>
+          </div>
+          <div className="cli-inventory" data-testid="cli-inventory" aria-label="訂閱 CLI 狀態">
+            {cliInventory.map((item) => {
+              const tone = item.state === 'available' ? 'ok' : item.state === 'call_failed' ? 'error' : 'warn'
+              return (
+                <div className="cli-inventory-item" key={item.id} data-cli-state={item.state}>
+                  <span className="cli-inventory-name">{item.label}</span>
+                  <span className={`state-chip ${tone}`}>{item.state_label}</span>
+                  <small>{item.recovery}</small>
+                </div>
+              )
+            })}
           </div>
           <div className="model-fields">
             <label>翻譯模型<ModelSelect value={runtime.translate_model} onChange={setRuntimeField('translate_model')} options={modelOptions?.translate} /></label>
@@ -65,8 +78,8 @@ export default function RuntimeSettings({
             <span>
               <strong>顯示訂閱 CLI 模型（Claude／Codex／Gemini）</strong>
             <small>{hasUnsavedChanges
-              ? '已變更但尚未生效——請按下方「儲存模型/上限」。只會使用你已安裝、已登入的 CLI 與其訂閱額度。'
-              : '勾選後一定要按「儲存模型/上限」才會生效；只會使用你已安裝、已登入的 CLI 與其訂閱額度，app 端不收 API 費用。請先確認各家服務條款。'}</small>
+              ? '已變更但尚未生效——請按下方「儲存模型/上限」。只會使用已偵測到的 CLI；登入狀態於實際呼叫時驗證。'
+              : '勾選後一定要按「儲存模型/上限」才會生效；只會使用已偵測到的 CLI，登入失敗會明確回報且不轉付費模型。app 端不收 API 費用，請先確認各家服務條款。'}</small>
             </span>
           </label>
           <div className="note-fields-row">

@@ -8,10 +8,10 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 #[cfg(debug_assertions)]
 use tauri_plugin_shell::ShellExt;
 
-// Dev uses the source-backed shell sidecar via externalBin (no rebuild needed).
-// Release ships the PyInstaller --onedir tree (exe + _internal/) as a Tauri
-// resource and spawns the inner exe directly: onedir skips the per-launch onefile
-// self-extraction, so the sidecar reaches ready in a fraction of the time.
+// Dev uses the target-suffixed PyInstaller onefile via externalBin; run
+// backend/build_sidecar.sh before tauri dev. Release ships the PyInstaller
+// --onedir tree (exe + _internal/) as a Tauri resource and spawns the inner exe
+// directly: onedir skips the per-launch onefile self-extraction.
 const SIDECAR_NAME: &str = if cfg!(debug_assertions) {
     "video-intake-fastapi-sidecar-dev"
 } else {
@@ -263,7 +263,7 @@ fn recover_on_error<T, E>(result: Result<T, E>, recover: impl FnOnce()) -> Resul
     result
 }
 
-/// Dev: spawn the source-backed shell sidecar via the shell plugin's externalBin
+/// Dev: spawn the generated target-suffixed sidecar via the shell plugin's externalBin.
 /// resolution, forwarding its event stream to the shared readiness/log helper.
 #[cfg(debug_assertions)]
 fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<SidecarSession>) {

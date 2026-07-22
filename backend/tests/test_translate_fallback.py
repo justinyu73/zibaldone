@@ -33,6 +33,17 @@ class ModelsForTaskChainTests(unittest.TestCase):
         finally:
             model_policy.load_model_policy = orig
 
+    def test_selected_cli_route_never_adds_paid_fallback(self):
+        import model_policy
+        orig = model_policy.load_model_policy
+        model_policy.load_model_policy = lambda: {
+            "tasks": {"translate": {"model": "cli:codex", "fallbacks": ["gpt-5-mini"]}}
+        }
+        try:
+            self.assertEqual(model_policy.models_for_task("translate", "fb"), ["cli:codex"])
+        finally:
+            model_policy.load_model_policy = orig
+
 
 class TranslateFallbackTests(unittest.TestCase):
     def setUp(self):

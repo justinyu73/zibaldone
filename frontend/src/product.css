@@ -549,6 +549,14 @@ button.ts-seek:hover { background: var(--brand); color: #fff; }
 .settings-state.error { background: var(--err-bg); color: var(--err-ink); border-color: var(--err-line); }
 .settings-note code { font-size: 12px; }
 .cli-model-notice strong { display: block; margin-bottom: 2px; }
+.cli-inventory { display: grid; gap: 6px; }
+.cli-inventory-item {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px;
+  align-items: center; padding: 8px 10px; border: 1px solid var(--neutral-line);
+  border-radius: var(--radius-control); background: var(--surface);
+}
+.cli-inventory-name { font-size: 13px; font-weight: 700; }
+.cli-inventory-item small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
 .settings-toggle {
   display: flex !important; align-items: flex-start; gap: 8px; padding: 10px 12px;
   border: 1px solid var(--info-line); border-radius: var(--radius-control); background: var(--info-bg);

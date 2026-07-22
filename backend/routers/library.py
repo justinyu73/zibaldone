@@ -74,7 +74,7 @@ class AgentIndexReq(BaseModel):
 
 @router.get("/api/app/agent-index/status")
 def app_state_agent_index_status(vault_root: VaultPath):
-    """Read the last Agent Bridge manifest without scanning or writing the vault."""
+    """Read the last Agent Bridge OKF bundle status without scanning or writing the vault."""
     from agent_index import AgentIndexError, agent_index_status
 
     try:

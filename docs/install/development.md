@@ -50,9 +50,14 @@ not point at a real note vault or make provider calls.
 On WSL/Linux:
 
 ```bash
+bash backend/build_sidecar.sh
 cd frontend
 npm run tauri:dev:wsl
 ```
+
+The helper generates the target-suffixed dev `externalBin` required by the
+Tauri shell and the separate release onedir resource tree. Re-run it after
+changing backend Python code.
 
 Release artifacts for Windows and macOS are built on their native GitHub-hosted
 runners. A successful source build does not replace target-machine install,

@@ -177,14 +177,17 @@ def model_options() -> Dict[str, Any]:
                "label": local_llm_builtin.MODEL_LABEL, "provider": "llamacpp"}]
              if local_llm_builtin.status()["ready"] else [])
     # 訂閱 CLI（spec B）：同範式——偵測到才出現，零設定、app 端零成本。
+    inventory = providers.cli_inventory()
     subscription = providers.cli_options()
     extra = local + subscription
+    base = {**MODEL_OPTIONS, "cli_inventory": inventory}
     if not extra:
-        return MODEL_OPTIONS
+        return base
     local_providers = list({o["provider"] for o in local})
     extra_providers = local_providers + (["cli"] if subscription else [])
     return {
         "translate": MODEL_OPTIONS["translate"] + extra,
         "summary": MODEL_OPTIONS["summary"] + extra,
         "providers": MODEL_OPTIONS["providers"] + extra_providers,
+        "cli_inventory": inventory,
     }

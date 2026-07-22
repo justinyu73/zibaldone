@@ -12,7 +12,7 @@ without any API key.
 cd backend && source .venv/bin/activate
 pip install -r requirements.txt
 bash run_tests.sh                        # stdlib unittest, no network
-python main.py                           # dev sidecar on :15173
+VIDEO_INTAKE_FASTAPI_PORT=8766 python sidecar_main.py  # app dev sidecar on :8766
 
 # Frontend (Node 22, npm)
 cd frontend && npm install
@@ -21,6 +21,7 @@ npm test                                 # Vitest unit tests
 npx playwright test                      # E2E (needs backend running)
 
 # Desktop bundle
+bash backend/build_sidecar.sh             # generate dev externalBin + release onedir
 bash build_desktop.sh                    # sidecar + Tauri .deb/.appimage
 ```
 

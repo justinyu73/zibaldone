@@ -66,7 +66,10 @@ export default function SettingsView({ settings, setSettings, onOpenSetup }) {
       const d = await (await apiFetch(`/app/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()
       setRt(d); setRtSaved(true); refreshCost()
       // 開/關 CLI 訂閱模型會改變可選模型清單（providers.py：關著一律空），存檔後重抓
-      apiFetch(`/app/model-options`).then((r) => r.json()).then(setModelOpts).catch(() => {})
+      apiFetch(`/app/model-options`).then((r) => r.json()).then((options) => {
+        setModelOpts(options)
+        window.dispatchEvent(new CustomEvent('zibaldone:model-options-changed'))
+      }).catch(() => {})
     } catch { /* ignore */ }
   }
 

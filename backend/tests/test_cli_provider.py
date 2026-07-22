@@ -27,6 +27,7 @@ class DetectProviderTests(unittest.TestCase):
 
 class CliOptionsTests(unittest.TestCase):
     def setUp(self):
+        providers._CLI_LAST_FAILURES.clear()
         # 預設關（S2 TOS 閘）——本組測「開啟後」的偵測行為
         self.enabled = mock.patch.object(
             providers.app_config, "get_settings",
@@ -35,6 +36,7 @@ class CliOptionsTests(unittest.TestCase):
 
     def tearDown(self):
         self.enabled.stop()
+        providers._CLI_LAST_FAILURES.clear()
 
     def test_only_installed_tools_appear(self):
         with mock.patch.object(providers, "_cli_path",
@@ -77,8 +79,32 @@ class CliOptionsTests(unittest.TestCase):
             path = providers._cli_path("claude")
         self.assertTrue(path and path.endswith("/claude"))
 
+    def test_inventory_keeps_all_three_with_explicit_states(self):
+        with mock.patch.object(providers, "_cli_path",
+                               side_effect=lambda name: "/bin/x" if name == "claude" else None):
+            inventory = providers.cli_inventory()
+        self.assertEqual([item["id"] for item in inventory], ["cli:claude", "cli:codex", "cli:gemini"])
+        self.assertEqual([item["state"] for item in inventory], ["available", "not_installed", "not_installed"])
+        self.assertEqual(inventory[1]["state_label"], "未安裝")
+        self.assertFalse(inventory[1]["selectable"])
+
+    def test_windows_npm_cmd_entrypoint_is_detected(self):
+        with mock.patch.object(providers.os, "name", "nt"), \
+             mock.patch.dict(providers.os.environ, {"APPDATA": r"C:\\Users\\tester\\AppData\\Roaming"}, clear=False), \
+             mock.patch.object(providers.shutil, "which", return_value=None), \
+             mock.patch.object(providers.os.path, "isfile", side_effect=lambda path: path.endswith("gemini.cmd")), \
+             mock.patch.object(providers.os, "access", return_value=True):
+            path = providers._cli_path("gemini")
+        self.assertTrue(path and path.endswith("gemini.cmd"))
+
 
 class CliChatTests(unittest.TestCase):
+    def setUp(self):
+        providers._CLI_LAST_FAILURES.clear()
+
+    def tearDown(self):
+        providers._CLI_LAST_FAILURES.clear()
+
     def _run(self, run_result=None, run_side_effect=None, **kwargs):
         with mock.patch.object(providers, "_cli_path", return_value="/bin/claude"), \
              mock.patch.object(providers.subprocess, "run",
@@ -114,6 +140,8 @@ class CliChatTests(unittest.TestCase):
             self._run(run_result=_proc(stderr="boom\nnot logged in", returncode=1))
         self.assertIn("not logged in", str(ctx.exception))
         self.assertIn("claude", str(ctx.exception))
+        with mock.patch.object(providers, "_cli_path", return_value="/bin/claude"):
+            self.assertEqual(providers.cli_inventory()[0]["state"], "call_failed")
 
     def test_empty_stdout_is_failure(self):
         with self.assertRaises(providers.ProviderError):

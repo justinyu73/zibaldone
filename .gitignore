@@ -27,6 +27,7 @@ frontend/dist/
 # OS / editor
 .DS_Store
 *.code-workspace
+test-results/
 frontend/test-results/
 
 # graphify derived knowledge graph (rebuild: graphify update .)

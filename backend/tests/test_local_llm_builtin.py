@@ -110,6 +110,22 @@ class ChatTests(unittest.TestCase):
 
 
 class OptionsMergeTests(unittest.TestCase):
+    def test_cli_inventory_is_fixed_and_selectable_model_reaches_both_lanes(self):
+        inventory = [
+            {"id": "cli:claude", "label": "Claude（訂閱）", "state": "available"},
+            {"id": "cli:codex", "label": "Codex（訂閱）", "state": "not_installed"},
+            {"id": "cli:gemini", "label": "Gemini（訂閱）", "state": "call_failed"},
+        ]
+        option = {"id": "cli:claude", "label": "Claude（訂閱）", "provider": "cli"}
+        with mock.patch.object(providers, "cli_inventory", return_value=inventory), \
+             mock.patch.object(providers, "cli_options", return_value=[option]), \
+             mock.patch.object(B, "status", return_value={"ready": False}):
+            out = S.model_options()
+        self.assertEqual(out["cli_inventory"], inventory)
+        self.assertIn(option, out["translate"])
+        self.assertIn(option, out["summary"])
+        self.assertIn("cli", out["providers"])
+
     def test_builtin_appears_when_ready(self):
         with mock.patch.object(providers, "cli_options", return_value=[]), \
              mock.patch.object(B, "status", return_value={"ready": True}):

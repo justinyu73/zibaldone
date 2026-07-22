@@ -11,16 +11,23 @@ export default function SummaryModelPicker({ transcriptionRoute = 'local', evide
     // 收錄是開機預設分頁，會在 sidecar 就緒前就掛載 → 首次 fetch 可能失敗。
     // 重試直到拿到 options，否則永遠卡「載入中」（設定頁是之後才點、剛好沒撞到）。
     let cancelled = false
+    let retryTimer
     const load = () => {
       apiFetch('/app/model-options').then((r) => r.json())
         .then((d) => { if (!cancelled) setOpts(d) })
-        .catch(() => { if (!cancelled) setTimeout(load, 1500) })
+        .catch(() => { if (!cancelled) retryTimer = setTimeout(load, 1500) })
       apiFetch('/app/settings').then((r) => r.json())
         .then((s) => { if (!cancelled) setModel(s.summary_model || '') })
         .catch(() => {})
     }
+    const refresh = () => load()
     load()
-    return () => { cancelled = true }
+    window.addEventListener('zibaldone:model-options-changed', refresh)
+    return () => {
+      cancelled = true
+      clearTimeout(retryTimer)
+      window.removeEventListener('zibaldone:model-options-changed', refresh)
+    }
   }, [])
   const change = async (e) => {
     const v = e.target.value
