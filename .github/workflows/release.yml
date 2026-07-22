@@ -90,7 +90,18 @@ jobs:
         shell: bash
         run: |
           if [ "${{ runner.os }}" = "macOS" ]; then
-            SIDECAR="$(find frontend/src-tauri/target/release/bundle/macos -type f -path '*/Contents/Resources/sidecar/video-intake-fastapi-sidecar' -print -quit)"
+            # Tauri's dir-resource copy has historically either flattened the onedir
+            # tree into Resources/sidecar/ or nested it under a repeated source-folder
+            # name (see resolve_sidecar_exe in lib.rs) — accept both here too, or the
+            # smoke step false-reds on a layout the app itself already tolerates.
+            SIDECAR="$(find frontend/src-tauri/target/release/bundle/macos -type f \( \
+              -path '*/Contents/Resources/sidecar/video-intake-fastapi-sidecar' -o \
+              -path '*/Contents/Resources/sidecar/video-intake-fastapi-sidecar/video-intake-fastapi-sidecar' \
+              \) -print -quit)"
+            if [ -z "$SIDECAR" ]; then
+              echo "::error::sidecar executable not found under Contents/Resources/sidecar; actual layout:"
+              find frontend/src-tauri/target/release/bundle/macos -path '*/Contents/Resources/sidecar*'
+            fi
           else
             SIDECAR="frontend/src-tauri/target/release/sidecar/video-intake-fastapi-sidecar.exe"
           fi
