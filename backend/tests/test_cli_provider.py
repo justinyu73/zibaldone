@@ -88,6 +88,25 @@ class CliOptionsTests(unittest.TestCase):
         self.assertEqual(inventory[1]["state_label"], "未安裝")
         self.assertFalse(inventory[1]["selectable"])
 
+    def test_not_installed_recovery_names_the_missing_binary_and_install_command(self):
+        # 未安裝的提示要講清楚「裝什麼」——本機找不到哪個指令、跑哪行指令能裝，
+        # 不能只給「確認已安裝並登入後重試」這種讓人猜的通用句。
+        with mock.patch.object(providers, "_cli_path", return_value=None):
+            inventory = providers.cli_inventory()
+        gemini = next(item for item in inventory if item["id"] == "cli:gemini")
+        self.assertIn("`gemini`", gemini["recovery"])
+        self.assertIn("npm install -g @google/gemini-cli", gemini["recovery"])
+
+    def test_call_failed_recovery_surfaces_last_failure_detail(self):
+        # 呼叫失敗的提示要帶真正的失敗原因（逾時／stderr 最後一行），不是猜「大概是沒登入」。
+        providers._CLI_LAST_FAILURES["claude"] = "逾時（300s）"
+        with mock.patch.object(providers, "_cli_path", return_value="/bin/claude"):
+            inventory = providers.cli_inventory()
+        claude = next(item for item in inventory if item["id"] == "cli:claude")
+        self.assertEqual(claude["state"], "call_failed")
+        self.assertIn("逾時（300s）", claude["recovery"])
+        self.assertIn("`claude`", claude["recovery"])
+
     def test_windows_npm_cmd_entrypoint_is_detected(self):
         with mock.patch.object(providers.os, "name", "nt"), \
              mock.patch.dict(providers.os.environ, {"APPDATA": r"C:\\Users\\tester\\AppData\\Roaming"}, clear=False), \

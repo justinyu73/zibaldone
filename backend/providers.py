@@ -27,6 +27,13 @@ _CLI_TOOLS: dict[str, dict[str, Any]] = {
     "codex": {"label": "Codex（訂閱）", "argv": lambda p: ["codex", "exec", "--skip-git-repo-check", p]},
     "gemini": {"label": "Gemini（訂閱）", "argv": lambda p: ["gemini", "-p", p]},
 }
+# state_label 只講狀態；使用者要知道「未安裝」指的是本機沒有哪個執行檔、要跑哪行指令才能裝，
+# 而非帳號訂閱本身有問題——App 只掃 PATH／常見安裝目錄，不會替使用者安裝這些 CLI。
+_CLI_INSTALL_HINT: dict[str, str] = {
+    "claude": "npm install -g @anthropic-ai/claude-code",
+    "codex": "npm install -g @openai/codex",
+    "gemini": "npm install -g @google/gemini-cli",
+}
 _CLI_TIMEOUT_SECONDS = 300
 _CLI_LAST_FAILURES: dict[str, str] = {}
 _CLI_STATE_LABELS = {
@@ -100,6 +107,22 @@ def cli_inventory() -> list[dict[str, Any]]:
             state = "call_failed"
         else:
             state = "available"
+        if state == "available":
+            recovery = "可直接選用"
+        elif state == "not_installed":
+            recovery = (
+                f"本機找不到 `{name}` 指令（App 只掃描 PATH 與常見安裝目錄，"
+                f"不會自動安裝）。請在終端機執行 `{_CLI_INSTALL_HINT[name]}` 安裝後，"
+                "重新整理本頁。"
+            )
+        elif state == "call_failed":
+            recovery = (
+                f"已找到本機的 `{name}` 執行檔，但上次呼叫失敗："
+                f"{_CLI_LAST_FAILURES[name]}——多半是尚未登入，"
+                f"請在終端機執行一次 `{name}` 完成登入後再重試。"
+            )
+        else:
+            recovery = "確認已安裝並登入後重試"
         inventory.append({
             "id": f"cli:{name}",
             "label": spec["label"],
@@ -107,10 +130,7 @@ def cli_inventory() -> list[dict[str, Any]]:
             "state": state,
             "state_label": _CLI_STATE_LABELS[state],
             "selectable": state == "available",
-            "recovery": (
-                "確認已安裝並登入後重試"
-                if state != "available" else "可直接選用"
-            ),
+            "recovery": recovery,
         })
     return inventory
 
