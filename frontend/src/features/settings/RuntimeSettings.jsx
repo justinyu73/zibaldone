@@ -11,8 +11,11 @@ export default function RuntimeSettings({
       .map((option) => [option.id, option]),
   ).values()]
   const cliModelNames = cliModels.map((option) => option.label || option.id.replace(/^cli:/, ''))
+  const cliInventory = modelOptions?.cli_inventory || []
   const cliEnabled = Boolean(runtime?.cli_providers_enabled)
   const hasUnsavedChanges = runtimeSaved === false
+  const costKnown = cost != null
+  const costBlocked = Boolean(cost?.over_daily_cap)
 
   return (
     <section className="panel settings-panel cost-panel">
@@ -20,13 +23,15 @@ export default function RuntimeSettings({
         <div><Coins size={16} /><h3>用量與成本</h3></div>
         <div className="row">
           <button className="ghost" onClick={() => { refreshCost(); refreshRuntime() }}>重新整理用量</button>
-          <span className={cost?.over_daily_cap ? 'state-chip error' : 'state-chip ok'}>{cost?.over_daily_cap ? '付費已擋' : '額度內'}</span>
+          <span className={`state-chip ${!costKnown ? 'info' : costBlocked ? 'error' : 'ok'}`}>
+            {!costKnown ? '狀態未知' : costBlocked ? '付費已擋' : '額度內'}
+          </span>
         </div>
       </div>
       <div className="cost-grid">
         <div className="cost-stat"><div className="cost-stat-label">今日花費</div><div className="cost-stat-value">${cost?.today_usd ?? '—'}</div><div className="muted">{cost?.today_calls ?? 0} 次呼叫</div></div>
         <div className="cost-stat"><div className="cost-stat-label">累計花費</div><div className="cost-stat-value">${cost?.total_usd ?? '—'}</div><div className="muted">{cost?.total_calls ?? 0} 次呼叫</div></div>
-        <div className="cost-stat"><div className="cost-stat-label">每日上限</div><div className="cost-stat-value">${cost?.daily_cap_usd ?? '—'}</div><div className={cost?.over_daily_cap ? 'state-chip error' : 'state-chip neutral'}>{cost?.over_daily_cap ? '已達上限' : '可執行'}</div></div>
+        <div className="cost-stat"><div className="cost-stat-label">每日上限</div><div className="cost-stat-value">${cost?.daily_cap_usd ?? '—'}</div><div className={`state-chip ${!costKnown ? 'info' : costBlocked ? 'error' : 'neutral'}`}>{!costKnown ? '無法確認' : costBlocked ? '已達上限' : '可執行'}</div></div>
       </div>
       {cost?.by_provider && Object.keys(cost.by_provider).length > 0 && (
         <div className="provider-breakdown">
@@ -47,9 +52,21 @@ export default function RuntimeSettings({
                 : cliEnabled
                 ? (cliModels.length
                   ? `目前可選：${cliModelNames.join('、')}。`
-                  : '已啟用，但尚未偵測到 claude、codex 或 gemini CLI。請確認已安裝並登入。')
+                  : '已啟用，但尚未偵測到 claude、codex 或 gemini CLI。請確認已安裝；登入狀態會在首次呼叫時驗證。')
                 : '未勾選時，CLI 不會出現在上方的翻譯／摘要模型清單；勾選下方開關並按「儲存模型/上限」後才會載入。'}
             </span>
+          </div>
+          <div className="cli-inventory" data-testid="cli-inventory" aria-label="訂閱 CLI 狀態">
+            {cliInventory.map((item) => {
+              const tone = item.state === 'available' ? 'ok' : item.state === 'call_failed' ? 'error' : 'warn'
+              return (
+                <div className="cli-inventory-item" key={item.id} data-cli-state={item.state}>
+                  <span className="cli-inventory-name">{item.label}</span>
+                  <span className={`state-chip ${tone}`}>{item.state_label}</span>
+                  <small>{item.recovery}</small>
+                </div>
+              )
+            })}
           </div>
           <div className="model-fields">
             <label>翻譯模型<ModelSelect value={runtime.translate_model} onChange={setRuntimeField('translate_model')} options={modelOptions?.translate} /></label>
@@ -65,8 +82,8 @@ export default function RuntimeSettings({
             <span>
               <strong>顯示訂閱 CLI 模型（Claude／Codex／Gemini）</strong>
             <small>{hasUnsavedChanges
-              ? '已變更但尚未生效——請按下方「儲存模型/上限」。只會使用你已安裝、已登入的 CLI 與其訂閱額度。'
-              : '勾選後一定要按「儲存模型/上限」才會生效；只會使用你已安裝、已登入的 CLI 與其訂閱額度，app 端不收 API 費用。請先確認各家服務條款。'}</small>
+              ? '已變更但尚未生效——請按下方「儲存模型/上限」。只會使用已偵測到的 CLI；登入狀態於實際呼叫時驗證。'
+              : '勾選後一定要按「儲存模型/上限」才會生效；只會使用已偵測到的 CLI，登入失敗會明確回報且不轉付費模型。app 端不收 API 費用，請先確認各家服務條款。'}</small>
             </span>
           </label>
           <div className="note-fields-row">

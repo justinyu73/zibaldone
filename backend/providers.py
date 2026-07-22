@@ -28,6 +28,13 @@ _CLI_TOOLS: dict[str, dict[str, Any]] = {
     "gemini": {"label": "Gemini（訂閱）", "argv": lambda p: ["gemini", "-p", p]},
 }
 _CLI_TIMEOUT_SECONDS = 300
+_CLI_LAST_FAILURES: dict[str, str] = {}
+_CLI_STATE_LABELS = {
+    "available": "可用",
+    "not_installed": "未安裝",
+    "call_failed": "未登入／呼叫失敗",
+    "unsupported_platform": "不可用於目前平台",
+}
 
 # GUI app（Tauri→sidecar）的 PATH 極簡（macOS LaunchServices 不帶 shell PATH），
 # which 找不到 nvm/npm/homebrew 裝的 CLI → 追掃常見安裝位置，回絕對路徑。
@@ -40,30 +47,87 @@ _CLI_EXTRA_DIRS = (
 
 
 def _cli_path(name: str) -> str | None:
-    found = shutil.which(name)
-    if found:
-        return found
+    names = [name]
+    if os.name == "nt":
+        names.append(f"{name}.cmd")
+    for executable in names:
+        found = shutil.which(executable)
+        if found:
+            return found
     import glob
-    candidates = [os.path.expanduser(f"{d}/{name}") for d in _CLI_EXTRA_DIRS]
-    candidates += sorted(glob.glob(os.path.expanduser(f"~/.nvm/versions/node/*/bin/{name}")), reverse=True)
-    if os.name == "nt" and os.environ.get("APPDATA"):
-        candidates.append(os.path.join(os.environ["APPDATA"], "npm", f"{name}.cmd"))
+    candidates = [
+        os.path.expanduser(f"{d}/{executable}")
+        for d in _CLI_EXTRA_DIRS
+        for executable in names
+    ]
+    candidates += [
+        path
+        for executable in names
+        for path in sorted(
+            glob.glob(os.path.expanduser(f"~/.nvm/versions/node/*/bin/{executable}")),
+            reverse=True,
+        )
+    ]
+    if os.name == "nt":
+        for env_name in ("APPDATA", "LOCALAPPDATA"):
+            npm_root = os.environ.get(env_name)
+            if npm_root:
+                candidates.extend(
+                    os.path.join(npm_root, "npm", executable)
+                    for executable in names
+                )
     for candidate in candidates:
-        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+        # Windows .cmd entrypoints do not carry a Unix executable bit.
+        runnable = os.name == "nt" and candidate.lower().endswith((".cmd", ".bat"))
+        if os.path.isfile(candidate) and (runnable or os.access(candidate, os.X_OK)):
             return candidate
     return None
 
 
+def cli_inventory() -> list[dict[str, Any]]:
+    """Return all supported subscription CLIs, including unavailable ones.
+
+    Presence detection is intentionally separate from invocation/login proof.
+    A failed call is remembered for the current sidecar session so the UI can
+    explain the state without silently removing the provider from the registry.
+    """
+    inventory: list[dict[str, Any]] = []
+    for name, spec in _CLI_TOOLS.items():
+        path = _cli_path(name)
+        if not path:
+            state = "not_installed"
+        elif name in _CLI_LAST_FAILURES:
+            state = "call_failed"
+        else:
+            state = "available"
+        inventory.append({
+            "id": f"cli:{name}",
+            "label": spec["label"],
+            "provider": "cli",
+            "state": state,
+            "state_label": _CLI_STATE_LABELS[state],
+            "selectable": state == "available",
+            "recovery": (
+                "確認已安裝並登入後重試"
+                if state != "available" else "可直接選用"
+            ),
+        })
+    return inventory
+
+
 def cli_options() -> list[dict[str, Any]]:
-    """裝了哪些訂閱 CLI → 下拉選項；只驗存在（登入狀態呼叫時才會知道）。沒裝＝不出現。
-    設定 cli_providers_enabled 預設關（TOS 灰色帶，須知情開啟）＝關著一律空。"""
+    """Return only selectable CLI models; inventory remains fixed elsewhere."""
     if not app_config.get_settings().get("cli_providers_enabled"):
         return []
     return [
-        {"id": f"cli:{name}", "label": spec["label"], "provider": "cli"}
-        for name, spec in _CLI_TOOLS.items()
-        if _cli_path(name)
+        {"id": item["id"], "label": item["label"], "provider": item["provider"]}
+        for item in cli_inventory()
+        if item["selectable"]
     ]
+
+
+def _remember_cli_failure(tool: str, detail: str) -> None:
+    _CLI_LAST_FAILURES[tool] = detail[:240]
 
 
 class ProviderError(RuntimeError):
@@ -184,13 +248,17 @@ def _cli_chat(model: str, prompt: str, system: str | None, json_mode: bool, json
         proc = subprocess.run(
             argv, capture_output=True, text=True, timeout=_CLI_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired as exc:
+        _remember_cli_failure(tool, f"逾時（{_CLI_TIMEOUT_SECONDS}s）")
         raise ProviderError(f"訂閱 CLI（{tool}）逾時（{_CLI_TIMEOUT_SECONDS}s）") from exc
     except OSError as exc:
+        _remember_cli_failure(tool, f"啟動失敗：{exc}")
         raise ProviderError(f"訂閱 CLI（{tool}）啟動失敗：{exc}") from exc
     text = (proc.stdout or "").strip()
     if proc.returncode != 0 or not text:
         detail_lines = (proc.stderr or proc.stdout or "").strip().splitlines()
         detail = detail_lines[-1] if detail_lines else f"exit {proc.returncode}"
+        _remember_cli_failure(tool, detail)
         raise ProviderError(f"訂閱 CLI（{tool}）呼叫失敗：{detail}——確認已登入（終端機跑一次 {tool}）")
+    _CLI_LAST_FAILURES.pop(tool, None)
     # 訂閱吃使用者自己的方案額度，app 端記 0 成本、0 token（無可靠 usage 來源，不杜撰）。
     return text, _norm_usage(0, 0)

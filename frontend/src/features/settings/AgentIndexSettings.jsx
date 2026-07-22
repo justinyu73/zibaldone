@@ -68,7 +68,7 @@ export default function AgentIndexSettings({ vaultRoot }) {
         <span>把 vault 的筆記 metadata 與關係連結產成 agent 可讀索引；原始筆記仍是唯一資料來源，不讀內文送雲端。</span>
       </div>
       <div className="state-list">
-        <div><span>輸出索引</span><strong><code>_zibaldone/agent-index/index.md</code></strong></div>
+        <div><span>輸出 bundle</span><strong><code>_zibaldone/agent-index/</code>（OKF v0.1）</strong></div>
         <div><span>更新方式</span><strong>手動、只在本機</strong></div>
         {status?.generated_at && <div><span>上次更新</span><strong>{status.generated_at}</strong></div>}
       </div>

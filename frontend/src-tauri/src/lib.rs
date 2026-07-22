@@ -8,10 +8,10 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 #[cfg(debug_assertions)]
 use tauri_plugin_shell::ShellExt;
 
-// Dev uses the source-backed shell sidecar via externalBin (no rebuild needed).
-// Release ships the PyInstaller --onedir tree (exe + _internal/) as a Tauri
-// resource and spawns the inner exe directly: onedir skips the per-launch onefile
-// self-extraction, so the sidecar reaches ready in a fraction of the time.
+// Dev uses the target-suffixed PyInstaller onefile via externalBin; run
+// backend/build_sidecar.sh before tauri dev. Release ships the PyInstaller
+// --onedir tree (exe + _internal/) as a Tauri resource and spawns the inner exe
+// directly: onedir skips the per-launch onefile self-extraction.
 const SIDECAR_NAME: &str = if cfg!(debug_assertions) {
     "video-intake-fastapi-sidecar-dev"
 } else {
@@ -90,15 +90,26 @@ fn clear_sidecar_pid(app: &tauri::AppHandle) {
     }
 }
 
-/// True iff a live process with `pid` is one of our sidecars. The name check
-/// guards against PID reuse: a recycled PID belonging to an unrelated process
-/// must never be killed.
+/// Full process command, used for ownership checks. `comm` is not enough on
+/// macOS for the older source-backed sidecar: it reports `Python`, while the
+/// script path lives in the command arguments.
+#[cfg(unix)]
+fn process_command(pid: u32) -> Option<String> {
+    std::process::Command::new("ps")
+        .args(["-ww", "-p", &pid.to_string(), "-o", "command="])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+/// True iff a live process with `pid` is one of the current packaged sidecars.
+/// The name check guards against PID reuse: a recycled PID belonging to an
+/// unrelated process must never be killed.
 #[cfg(unix)]
 fn is_our_sidecar(pid: u32) -> bool {
-    std::process::Command::new("ps")
-        .args(["-p", &pid.to_string(), "-o", "comm="])
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).contains("video-intake"))
+    process_command(pid)
+        .map(|command| command.contains("video-intake"))
         .unwrap_or(false)
 }
 
@@ -112,6 +123,70 @@ fn is_our_sidecar(pid: u32) -> bool {
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).contains("video-intake-fastapi-sidecar"))
         .unwrap_or(false)
+}
+
+/// Legacy releases launched `python …/sidecar_main.py`, so macOS reports their
+/// process name as Python rather than video-intake-fastapi-sidecar. Command text
+/// narrows candidates; the loopback health fingerprint below is still required
+/// before reaping anything under this compatibility path.
+#[cfg(unix)]
+fn looks_like_legacy_sidecar_command(command: &str) -> bool {
+    let command = command.to_ascii_lowercase();
+    command.contains("sidecar_main.py")
+        || (command.contains("uvicorn") && command.contains("main:app"))
+}
+
+/// `/api/health` is intentionally session-public. A process on the fixed port
+/// is eligible for legacy reaping only when it returns the stable Zibaldone
+/// health shape; a Python process or unrelated HTTP service is never enough.
+fn is_zibaldone_health_response(response: &str) -> bool {
+    response.starts_with("HTTP/1.1 200")
+        && response.contains("\"model_policy\"")
+        && response.contains("\"provider_runtime\"")
+}
+
+#[cfg(unix)]
+fn loopback_health_is_zibaldone_sidecar() -> bool {
+    use std::io::{Read, Write};
+    use std::net::{SocketAddr, TcpStream};
+
+    let address: SocketAddr = format!("127.0.0.1:{SIDECAR_PORT}")
+        .parse()
+        .expect("fixed loopback address");
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, std::time::Duration::from_millis(400)) else {
+        return false;
+    };
+    let timeout = Some(std::time::Duration::from_millis(600));
+    let _ = stream.set_read_timeout(timeout);
+    let _ = stream.set_write_timeout(timeout);
+    if stream
+        .write_all(b"GET /api/health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .is_err()
+    {
+        return false;
+    }
+    let mut response = String::new();
+    stream.read_to_string(&mut response).is_ok()
+        && is_zibaldone_health_response(&response)
+}
+
+/// Current PyInstaller sidecars are name-verified. A legacy Python/uvicorn
+/// sidecar is reaped only when both its command and its loopback health endpoint
+/// prove it belongs to this app.
+#[cfg(unix)]
+fn is_reapable_sidecar(pid: u32) -> bool {
+    if is_our_sidecar(pid) {
+        return true;
+    }
+    let Some(command) = process_command(pid) else {
+        return false;
+    };
+    looks_like_legacy_sidecar_command(&command) && loopback_health_is_zibaldone_sidecar()
+}
+
+#[cfg(not(unix))]
+fn is_reapable_sidecar(pid: u32) -> bool {
+    is_our_sidecar(pid)
 }
 
 #[cfg(unix)]
@@ -171,7 +246,7 @@ fn reap_previous_sidecar(app: &tauri::AppHandle) {
     if let Some(path) = sidecar_pid_path(app) {
         if let Ok(text) = std::fs::read_to_string(&path) {
             if let Ok(pid) = text.trim().parse::<u32>() {
-                if is_our_sidecar(pid) {
+                if is_reapable_sidecar(pid) {
                     log::info!("[sidecar] reaping leftover sidecar pid {pid}");
                     kill_pid(pid);
                     std::thread::sleep(std::time::Duration::from_millis(300));
@@ -184,9 +259,10 @@ fn reap_previous_sidecar(app: &tauri::AppHandle) {
     // (pid file overwritten by a later spawn while the old sidecar survived a
     // forced-quit) squats the fixed port with a stale session token — every
     // request 401s and the install looks broken. Sweep the port too; the
-    // is_our_sidecar name check still guarantees no unrelated process is killed.
+    // is_reapable_sidecar still guarantees no unrelated process is killed. It
+    // accepts the legacy Python launcher only after an app-specific health probe.
     for pid in port_listener_pids(SIDECAR_PORT) {
-        if is_our_sidecar(pid) {
+        if is_reapable_sidecar(pid) {
             log::warn!("[sidecar] reaping port-squatting orphan sidecar pid {pid}");
             kill_pid(pid);
             std::thread::sleep(std::time::Duration::from_millis(300));
@@ -263,7 +339,7 @@ fn recover_on_error<T, E>(result: Result<T, E>, recover: impl FnOnce()) -> Resul
     result
 }
 
-/// Dev: spawn the source-backed shell sidecar via the shell plugin's externalBin
+/// Dev: spawn the generated target-suffixed sidecar via the shell plugin's externalBin.
 /// resolution, forwarding its event stream to the shared readiness/log helper.
 #[cfg(debug_assertions)]
 fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<SidecarSession>) {
@@ -589,6 +665,33 @@ mod tests {
         // The squatter sweep must still refuse to kill: this test process is a
         // listener on the port but is not a name-verified sidecar.
         assert!(!is_our_sidecar(std::process::id()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn legacy_sidecar_fingerprint_requires_a_specific_launcher_command() {
+        assert!(looks_like_legacy_sidecar_command(
+            "/usr/bin/python3 /tmp/zibaldone/backend/sidecar_main.py"
+        ));
+        assert!(looks_like_legacy_sidecar_command(
+            "/usr/bin/python3 -m uvicorn main:app --port 8766"
+        ));
+        assert!(!looks_like_legacy_sidecar_command(
+            "/usr/bin/python3 /tmp/unrelated-worker.py"
+        ));
+    }
+
+    #[test]
+    fn health_identity_requires_zibaldone_markers() {
+        assert!(is_zibaldone_health_response(
+            "HTTP/1.1 200 OK\r\n\r\n{\"model_policy\":{},\"provider_runtime\":{}}"
+        ));
+        assert!(!is_zibaldone_health_response(
+            "HTTP/1.1 200 OK\r\n\r\n{\"status\":\"ok\"}"
+        ));
+        assert!(!is_zibaldone_health_response(
+            "HTTP/1.1 503 Service Unavailable\r\n\r\n{\"model_policy\":{},\"provider_runtime\":{}}"
+        ));
     }
 
     #[test]

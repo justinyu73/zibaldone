@@ -18,7 +18,9 @@ test('settings generates a local Agent Bridge index without rewriting source not
 
   await expect(panel).toContainText('Agent 索引已更新')
   expect(fixture.exists('_zibaldone/agent-index/index.md')).toBe(true)
-  expect(fixture.exists('_zibaldone/agent-index/manifest.json')).toBe(true)
+  expect(fixture.exists('_zibaldone/agent-index/concepts/02_Sources/youtube/e2e_video.md')).toBe(true)
+  expect(fixture.exists('_zibaldone/agent-index/manifest.json')).toBe(false)
   expect(fixture.read('02_Sources/youtube/e2e_video.md')).toBe(original)
+  expect(fixture.read('_zibaldone/agent-index/index.md')).toContain('okf_version: \"0.1\"')
   expect(fixture.read('_zibaldone/agent-index/index.md')).toContain('E2E 測試影片筆記')
 })

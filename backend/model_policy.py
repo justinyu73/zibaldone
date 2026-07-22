@@ -48,6 +48,11 @@ def models_for_task(task: str, fallback: str = "gpt-5-mini") -> list[str]:
     Empty fallbacks = identical to model_for_task (single provider, current behavior)."""
     primary = model_for_task(task, fallback)
     chain = [primary]
+    # A selected subscription CLI is an explicit operator route. Its login or
+    # invocation failure must remain visible; never silently spend on a paid
+    # fallback from the generic task policy.
+    if primary.lower().startswith("cli:"):
+        return chain
     config = load_model_policy().get("tasks", {}).get(task, {})
     for fb in config.get("fallbacks") or []:
         fb = str(fb).strip()

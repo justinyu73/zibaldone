@@ -47,7 +47,13 @@ export default function SettingsView({ settings, setSettings, onOpenSetup }) {
   const [modelOpts, setModelOpts] = useState(null)
   const setRtField = (k) => (e) => { setRt({ ...rt, [k]: e.target.value }); setRtSaved(false) }
 
-  async function refreshCost() { try { setCost(await (await apiFetch(`/app/cost-summary`)).json()) } catch { setCost(null) } }
+  async function refreshCost() {
+    try {
+      const response = await apiFetch(`/app/cost-summary`)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      setCost(await response.json())
+    } catch { setCost(null) }
+  }
   async function refreshRt() {
     try { setRt(await (await apiFetch(`/app/settings`)).json()); setRtSaved(null) }
     catch { setRt(null); setRtSaved(null) }
@@ -66,7 +72,10 @@ export default function SettingsView({ settings, setSettings, onOpenSetup }) {
       const d = await (await apiFetch(`/app/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()
       setRt(d); setRtSaved(true); refreshCost()
       // 開/關 CLI 訂閱模型會改變可選模型清單（providers.py：關著一律空），存檔後重抓
-      apiFetch(`/app/model-options`).then((r) => r.json()).then(setModelOpts).catch(() => {})
+      apiFetch(`/app/model-options`).then((r) => r.json()).then((options) => {
+        setModelOpts(options)
+        window.dispatchEvent(new CustomEvent('zibaldone:model-options-changed'))
+      }).catch(() => {})
     } catch { /* ignore */ }
   }
 
@@ -135,6 +144,8 @@ export default function SettingsView({ settings, setSettings, onOpenSetup }) {
   const modelProvider = (id) => providerLabelForModel(id, [...(modelOpts?.translate || []), ...(modelOpts?.summary || [])])
   const healthText = { checking: '檢查中…', ok: '已連線', down: '後端未連線，請稍候或重新開啟 App' }
   const healthTone = health === 'ok' ? 'ok' : health === 'down' ? 'error' : 'info'
+  const costText = cost == null ? '成本狀態未知' : cost.over_daily_cap ? '成本已擋' : '成本額度內'
+  const costTone = cost == null ? 'info' : cost.over_daily_cap ? 'error' : 'ok'
   const configuredProviderCount = PROVIDER_ORDER.filter((p) => keyStatus?.providers?.[p]?.key_set).length
   const derived = deriveVaultPaths(draft.vaultRoot || settings.vaultRoot)
   const noteTarget = derived.youtube || '後端預設'
@@ -160,7 +171,7 @@ export default function SettingsView({ settings, setSettings, onOpenSetup }) {
           <div className="command-meta">
             <span className={`state-chip ${healthTone}`}><Database size={13} /> 後端：{healthText[health]}</span>
             <span className="state-chip neutral"><KeyRound size={13} /> 金鑰 {configuredProviderCount}/{PROVIDER_ORDER.length} 已設定</span>
-            <span className={cost?.over_daily_cap ? 'state-chip error' : 'state-chip ok'}><Coins size={13} /> {cost?.over_daily_cap ? '成本已擋' : '成本額度內'}</span>
+            <span className={`state-chip ${costTone}`}><Coins size={13} /> {costText}</span>
           </div>
         </div>
         <div className="command-actions">

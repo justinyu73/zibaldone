@@ -17,12 +17,15 @@ from typing import Any
 from urllib.parse import quote
 
 
-AGENT_INDEX_VERSION = 1
+AGENT_INDEX_VERSION = 2
+OKF_VERSION = "0.1"
 AGENT_INDEX_DIR = "_zibaldone/agent-index"
 AGENT_INDEX_PATH = f"{AGENT_INDEX_DIR}/index.md"
 AGENT_MANIFEST_PATH = f"{AGENT_INDEX_DIR}/manifest.json"
+AGENT_CONCEPT_DIR = f"{AGENT_INDEX_DIR}/concepts"
 AGENT_INDEX_START = "<!-- zibaldone:agent-index:start -->"
 AGENT_INDEX_END = "<!-- zibaldone:agent-index:end -->"
+AGENT_CONCEPT_MARKER = "<!-- zibaldone:okf-concept -->"
 MAX_NOTES = 5000
 
 _FRONTMATTER_RE = re.compile(r"\A(?:\ufeff)?---\s*\n(.*?)\n---\s*(?:\n|\Z)", re.DOTALL)
@@ -87,7 +90,7 @@ def _parse_scalar(value: str) -> str | list[str]:
     return value
 
 
-def _frontmatter(content: str) -> dict[str, str | list[str]]:
+def _frontmatter_all(content: str) -> dict[str, str | list[str]]:
     match = _FRONTMATTER_RE.search(content)
     if not match:
         return {}
@@ -97,9 +100,12 @@ def _frontmatter(content: str) -> dict[str, str | list[str]]:
             continue
         key, value = line.split(":", 1)
         key = key.strip()
-        if key in _METADATA_KEYS:
-            fields[key] = _parse_scalar(value)
+        fields[key] = _parse_scalar(value)
     return fields
+
+
+def _frontmatter(content: str) -> dict[str, str | list[str]]:
+    return {key: value for key, value in _frontmatter_all(content).items() if key in _METADATA_KEYS}
 
 
 def _text_value(value: Any) -> str:
@@ -199,17 +205,95 @@ def scan_vault(vault_root: str) -> dict[str, Any]:
     return {"root": root, "records": records, "skipped_count": skipped, "truncated": truncated}
 
 
-def _link_target(index_path: str) -> str:
-    return quote(f"../../{index_path}", safe="/:@-_.~()")
+def _bundle_link_target(bundle_path: str) -> str:
+    return quote(bundle_path, safe="/:@-_.~()")
 
 
-def render_index(records: list[dict[str, Any]], *, skipped_count: int = 0, truncated: bool = False) -> str:
+def _concept_path(source_path: str) -> str:
+    parts = source_path.split("/")
+    if parts[-1] in {"index.md", "log.md"}:
+        parts[-1] = f"{Path(parts[-1]).stem}.note.md"
+    return "/".join(("concepts", *parts))
+
+
+def _yaml_string(value: Any) -> str:
+    return json.dumps(str(value or ""), ensure_ascii=False)
+
+
+def _yaml_list(values: list[str]) -> str:
+    return json.dumps(values, ensure_ascii=False)
+
+
+def _safe_heading(value: str) -> str:
+    return " ".join(str(value or "Note").splitlines()).strip() or "Note"
+
+
+def _source_link(root: Path, concept_path: str, source_path: str) -> str:
+    concept_file = root / AGENT_INDEX_DIR / concept_path
+    source_file = root / source_path
+    relative = os.path.relpath(source_file, start=concept_file.parent).replace(os.sep, "/")
+    return quote(relative, safe="/:@-_.~()")
+
+
+def _render_concept(root: Path, record: dict[str, Any]) -> str:
+    source_path = str(record["path"])
+    concept_path = _concept_path(source_path)
+    lines = ["---", f"type: {_yaml_string(record.get('type') or 'note')}"]
+    for key in ("title", "description", "status", "category", "source", "next_action"):
+        if record.get(key):
+            lines.append(f"{key}: {_yaml_string(record[key])}")
+    if record.get("updated") or record.get("created"):
+        lines.append(f"timestamp: {_yaml_string(record.get('updated') or record.get('created'))}")
+    if record.get("source_url"):
+        lines.append(f"resource: {_yaml_string(record['source_url'])}")
+    if record.get("tags"):
+        lines.append(f"tags: {_yaml_list(record['tags'])}")
+    lines.extend(
+        [
+            f"zibaldone_source_path: {_yaml_string(source_path)}",
+            "zibaldone_projection: \"metadata-only\"",
+            "---",
+            "",
+            AGENT_CONCEPT_MARKER,
+            f"# {_safe_heading(record['title'])}",
+            "",
+            "This is a metadata-only OKF projection. The vault note remains the source of truth.",
+            "",
+            f"Original note: [{source_path}]({_source_link(root, concept_path, source_path)})",
+        ]
+    )
+    if record.get("links"):
+        lines.extend(["", "## Relations", ""])
+        for link in record["links"]:
+            target = str(link)
+            if target.startswith("[[") and target.endswith("]]"):
+                target = target[2:-2]
+            target_path = target.split("#", 1)[0]
+            if target_path.endswith(".md"):
+                lines.append(f"- [{target}]({_bundle_link_target(_concept_path(target_path))})")
+            else:
+                lines.append(f"- {link}")
+    return "\n".join(lines) + "\n"
+
+
+def _render_index(
+    records: list[dict[str, Any]], *, skipped_count: int = 0, truncated: bool = False
+) -> str:
     lines = [
-        "# Zibaldone Agent Index",
+        "---",
+        f"okf_version: {_yaml_string(OKF_VERSION)}",
+        f"zibaldone_agent_bridge_version: {AGENT_INDEX_VERSION}",
+        'zibaldone_generated_by: "zibaldone"',
+        f"zibaldone_note_count: {len(records)}",
+        f"zibaldone_skipped_count: {skipped_count}",
+        f"zibaldone_truncated: {str(truncated).lower()}",
+        "---",
+        "",
+        "# Zibaldone Agent Bundle",
         "",
         AGENT_INDEX_START,
-        "> This is a generated projection for coding and research agents.",
-        "> The vault's Markdown files remain the source of truth; do not edit this index as canonical content.",
+        "> This is a generated OKF v0.1 projection for coding and research agents.",
+        "> The vault's Markdown files remain the source of truth; do not edit this bundle as canonical content.",
         "> Refresh it manually from Zibaldone when the vault changes.",
         AGENT_INDEX_END,
         "",
@@ -221,32 +305,27 @@ def render_index(records: list[dict[str, Any]], *, skipped_count: int = 0, trunc
         "- Privacy boundary: metadata and local relative links only; no provider, connector, or network call.",
         "",
     ]
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for record in records:
-        group = record["path"].split("/", 1)[0] if "/" in record["path"] else "(root)"
-        groups.setdefault(group, []).append(record)
     if not records:
-        lines.extend(["## Notes", "", "No visible Markdown notes found.", ""])
+        lines.extend(["## Concepts", "", "No visible Markdown notes found.", ""])
         return "\n".join(lines)
-    for group in sorted(groups):
-        items = groups[group]
-        lines.extend([f"## {group} ({len(items)})", ""])
-        for record in items:
-            metadata = [f"type: {record['type']}"]
-            for key in ("status", "updated", "category", "source"):
-                if record.get(key):
-                    metadata.append(f"{key}: {record[key]}")
-            lines.append(f"- [{record['title']}]({_link_target(record['path'])}) — {'; '.join(metadata)}")
-            if record.get("description"):
-                lines.append(f"  - description: {record['description']}")
-            if record.get("tags"):
-                lines.append(f"  - tags: {', '.join(record['tags'])}")
-            if record.get("source_url"):
-                lines.append(f"  - source: {record['source_url']}")
-            if record.get("links"):
-                lines.append(f"  - relations: {', '.join(record['links'])}")
-        lines.append("")
+    lines.extend(["## Concepts", ""])
+    for record in records:
+        concept_path = _concept_path(str(record["path"]))
+        metadata = [f"type: {record['type']}"]
+        for key in ("status", "updated", "category", "source"):
+            if record.get(key):
+                metadata.append(f"{key}: {record[key]}")
+        lines.append(f"- [{_safe_heading(record['title'])}]({_bundle_link_target(concept_path)}) — {'; '.join(metadata)}")
+    lines.append("")
     return "\n".join(lines)
+
+
+def _render_bundle(root: Path, records: list[dict[str, Any]], *, skipped_count: int, truncated: bool) -> dict[str, str]:
+    bundle = {"index.md": _render_index(records, skipped_count=skipped_count, truncated=truncated)}
+    for record in records:
+        concept_path = _concept_path(str(record["path"]))
+        bundle[concept_path] = _render_concept(root, record)
+    return bundle
 
 
 def _managed_index(path: Path) -> bool:
@@ -264,6 +343,66 @@ def _read_manifest(path: Path) -> dict[str, Any] | None:
     return data if isinstance(data, dict) and data.get("generated_by") == "zibaldone" else None
 
 
+def _generated_concepts(root: Path) -> list[Path]:
+    concept_root = root / AGENT_CONCEPT_DIR
+    if not concept_root.is_dir():
+        return []
+    generated: list[Path] = []
+    for path in sorted(concept_root.rglob("*.md")):
+        try:
+            content = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if AGENT_CONCEPT_MARKER in content:
+            generated.append(path)
+    return generated
+
+
+def _bundle_changed(root: Path, bundle: dict[str, str]) -> bool:
+    for relative, expected in bundle.items():
+        path = root / AGENT_INDEX_DIR / relative
+        try:
+            if path.read_text(encoding="utf-8") != expected:
+                return True
+        except OSError:
+            return True
+    expected_paths = {root / AGENT_INDEX_DIR / relative for relative in bundle if relative != "index.md"}
+    return any(path not in expected_paths for path in _generated_concepts(root))
+
+
+def _protect_bundle_outputs(root: Path, bundle: dict[str, str]) -> None:
+    index_path = root / AGENT_INDEX_PATH
+    if index_path.exists() and not _managed_index(index_path):
+        raise AgentIndexError(f"不覆寫非 Zibaldone 產生的索引：{AGENT_INDEX_PATH}")
+    manifest_path = root / AGENT_MANIFEST_PATH
+    if manifest_path.exists() and _read_manifest(manifest_path) is None:
+        raise AgentIndexError(f"不覆寫非 Zibaldone 產生的 manifest：{AGENT_MANIFEST_PATH}")
+    concept_root = root / AGENT_CONCEPT_DIR
+    expected_paths = {root / AGENT_INDEX_DIR / relative for relative in bundle if relative != "index.md"}
+    if concept_root.is_dir():
+        for path in concept_root.rglob("*.md"):
+            if path not in expected_paths and AGENT_CONCEPT_MARKER not in path.read_text(encoding="utf-8", errors="replace"):
+                raise AgentIndexError(f"不覆寫 Agent Bridge concepts 下的使用者檔案：{path.relative_to(root).as_posix()}")
+            if path in expected_paths and AGENT_CONCEPT_MARKER not in path.read_text(encoding="utf-8", errors="replace"):
+                raise AgentIndexError(f"不覆寫非 Zibaldone 產生的 concept：{path.relative_to(root).as_posix()}")
+
+
+def _remove_stale_generated_concepts(root: Path, bundle: dict[str, str]) -> None:
+    expected_paths = {root / AGENT_INDEX_DIR / relative for relative in bundle if relative != "index.md"}
+    for path in _generated_concepts(root):
+        if path in expected_paths:
+            continue
+        path.unlink()
+        parent = path.parent
+        concept_root = root / AGENT_CONCEPT_DIR
+        while parent != concept_root and parent != root:
+            try:
+                parent.rmdir()
+            except OSError:
+                break
+            parent = parent.parent
+
+
 def _atomic_write(path: Path, content: str) -> None:
     temp = path.with_name(f".{path.name}.tmp")
     temp.write_text(content, encoding="utf-8")
@@ -271,52 +410,50 @@ def _atomic_write(path: Path, content: str) -> None:
 
 
 def generate_agent_index(vault_root: str, *, write: bool = False, confirm: bool = False) -> dict[str, Any]:
-    """Build an index, optionally writing only Zibaldone-owned derived files."""
+    """Build an OKF bundle, optionally writing only Zibaldone-owned files."""
     if write and not confirm:
         raise AgentIndexError("產生 Agent 索引需要明確確認（confirm=true）")
     scanned = scan_vault(vault_root)
     root: Path = scanned["root"]
-    index_text = render_index(
-        scanned["records"], skipped_count=scanned["skipped_count"], truncated=scanned["truncated"]
+    bundle = _render_bundle(
+        root,
+        scanned["records"],
+        skipped_count=scanned["skipped_count"],
+        truncated=scanned["truncated"],
     )
+    index_text = bundle["index.md"]
     index_hash = hashlib.sha256(index_text.encode("utf-8")).hexdigest()
     index_path = root / AGENT_INDEX_PATH
     manifest_path = root / AGENT_MANIFEST_PATH
     previous = _read_manifest(manifest_path)
-    previous_hash = str(previous.get("index_sha256")) if previous else ""
-    changed = previous_hash != index_hash or not index_path.is_file()
+    changed = _bundle_changed(root, bundle) or previous is not None
     generated = False
     if write and changed:
-        if index_path.exists() and not _managed_index(index_path):
-            raise AgentIndexError(f"不覆寫非 Zibaldone 產生的索引：{AGENT_INDEX_PATH}")
-        if manifest_path.exists() and previous is None:
-            raise AgentIndexError(f"不覆寫非 Zibaldone 產生的 manifest：{AGENT_MANIFEST_PATH}")
+        _protect_bundle_outputs(root, bundle)
         output_dir = root / AGENT_INDEX_DIR
         output_dir.mkdir(parents=True, exist_ok=True)
+        _remove_stale_generated_concepts(root, bundle)
         _atomic_write(index_path, index_text)
-        manifest = {
-            "agent_index_version": AGENT_INDEX_VERSION,
-            "generated_by": "zibaldone",
-            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "source_of_truth": "vault_markdown",
-            "scope": "visible_markdown_metadata_and_links",
-            "index_path": AGENT_INDEX_PATH,
-            "manifest_path": AGENT_MANIFEST_PATH,
-            "index_sha256": index_hash,
-            "note_count": len(scanned["records"]),
-            "skipped_count": scanned["skipped_count"],
-            "truncated": scanned["truncated"],
-            "records": scanned["records"],
-        }
-        _atomic_write(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+        for relative, content in bundle.items():
+            if relative == "index.md":
+                continue
+            destination = root / AGENT_INDEX_DIR / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            _atomic_write(destination, content)
+        if previous is not None and manifest_path.exists():
+            manifest_path.unlink()
         generated = True
     return {
         "ok": True,
         "dry_run": not write,
         "generated": generated,
         "changed": changed,
+        "bundle_path": AGENT_INDEX_DIR,
         "index_path": AGENT_INDEX_PATH,
-        "manifest_path": AGENT_MANIFEST_PATH,
+        "manifest_path": None,
+        "okf_version": OKF_VERSION,
+        "agent_index_version": AGENT_INDEX_VERSION,
+        "concept_count": len(scanned["records"]),
         "note_count": len(scanned["records"]),
         "skipped_count": scanned["skipped_count"],
         "truncated": scanned["truncated"],
@@ -327,16 +464,34 @@ def generate_agent_index(vault_root: str, *, write: bool = False, confirm: bool 
 def agent_index_status(vault_root: str) -> dict[str, Any]:
     root = _vault_root(vault_root)
     index_path = root / AGENT_INDEX_PATH
-    manifest_path = root / AGENT_MANIFEST_PATH
-    manifest = _read_manifest(manifest_path)
+    metadata: dict[str, Any] = {}
+    index_hash = ""
+    generated_at = None
+    if index_path.is_file():
+        try:
+            index_content = index_path.read_text(encoding="utf-8")
+            metadata = _frontmatter_all(index_content)
+            index_hash = hashlib.sha256(index_content.encode("utf-8")).hexdigest()
+            generated_at = datetime.fromtimestamp(index_path.stat().st_mtime, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        except OSError:
+            pass
+
+    def _int_metadata(key: str) -> int | None:
+        try:
+            return int(str(metadata.get(key, "")))
+        except ValueError:
+            return None
+
     return {
         "ok": True,
+        "bundle_path": AGENT_INDEX_DIR,
         "index_path": AGENT_INDEX_PATH,
-        "manifest_path": AGENT_MANIFEST_PATH,
+        "manifest_path": None,
         "exists": index_path.is_file(),
-        "managed": bool(manifest and _managed_index(index_path)),
-        "agent_index_version": manifest.get("agent_index_version") if manifest else None,
-        "generated_at": manifest.get("generated_at") if manifest else None,
-        "note_count": manifest.get("note_count", 0) if manifest else 0,
-        "index_sha256": manifest.get("index_sha256", "") if manifest else "",
+        "managed": bool(metadata.get("okf_version") == OKF_VERSION and _managed_index(index_path)),
+        "agent_index_version": _int_metadata("zibaldone_agent_bridge_version"),
+        "okf_version": metadata.get("okf_version"),
+        "generated_at": generated_at,
+        "note_count": _int_metadata("zibaldone_note_count") or 0,
+        "index_sha256": index_hash,
     }

@@ -86,6 +86,16 @@ jobs:
         working-directory: frontend
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      - name: smoke bundled sidecar
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            SIDECAR="$(find frontend/src-tauri/target/release/bundle/macos -type f -path '*/Contents/Resources/sidecar/video-intake-fastapi-sidecar' -print -quit)"
+          else
+            SIDECAR="frontend/src-tauri/target/release/sidecar/video-intake-fastapi-sidecar.exe"
+          fi
+          test -n "$SIDECAR"
+          bash scripts/smoke_bundled_sidecar.sh "$SIDECAR"
       - name: enforce release size budget
         run: python3 scripts/product_readiness_check.py --artifacts frontend/src-tauri/target/release/bundle
       - name: upload release assets
@@ -94,7 +104,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          NOTES_FILE="docs/releases/${TAG#v}.md"
+          NOTES_FILE="docs/releases/v${TAG#v}.md"
           if [ -f "$NOTES_FILE" ]; then
             gh release create "$TAG" --title "Zibaldone $TAG" --notes-file "$NOTES_FILE" 2>/dev/null || true
           else

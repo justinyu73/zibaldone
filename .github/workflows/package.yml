@@ -49,34 +49,46 @@ jobs:
         env:
           TAURI_CONFIG: '{"bundle":{"externalBin":[]}}'
       - run: pip install -r backend/requirements.txt pyinstaller
-      - name: build sidecar (PyInstaller, per-OS)
+      - name: build sidecar (PyInstaller --onedir, per-OS)
         shell: bash
         run: |
           cd backend
-          pyinstaller --onefile --name video-intake-fastapi-sidecar \
+          pyinstaller --onedir --name video-intake-fastapi-sidecar \
             --add-data "enabled_models.json${{ matrix.sep }}." \
             --collect-submodules uvicorn --collect-submodules anyio \
             --collect-data trafilatura --collect-data justext --collect-data tld --collect-data certifi \
             --collect-submodules anthropic --collect-submodules google.genai \
+            --collect-submodules yt_dlp --copy-metadata yt-dlp \
             --copy-metadata anthropic --copy-metadata google-genai \
             --hidden-import uvicorn.logging --hidden-import uvicorn.loops.auto \
             --hidden-import uvicorn.protocols.http.auto \
             --hidden-import uvicorn.protocols.websockets.auto --hidden-import uvicorn.lifespan.on \
             sidecar_main.py
-          TRIPLE="$(rustc -vV | sed -n 's/host: //p')"
+          # onedir is a folder (exe + _internal/); bundle it whole as a Tauri
+          # resource. No target-triple suffix is used for resource paths.
+          rm -rf ../frontend/src-tauri/binaries/video-intake-fastapi-sidecar
           mkdir -p ../frontend/src-tauri/binaries
-          # RC/test package must match release: production sidecar only.
-          cp "dist/video-intake-fastapi-sidecar${{ matrix.ext }}" \
-             "../frontend/src-tauri/binaries/video-intake-fastapi-sidecar-${TRIPLE}${{ matrix.ext }}"
+          cp -R dist/video-intake-fastapi-sidecar \
+             ../frontend/src-tauri/binaries/video-intake-fastapi-sidecar
       - run: npm ci
         working-directory: frontend
       - name: tauri build
-        run: npx tauri build --bundles ${{ matrix.bundles }} --config '{"bundle":{"externalBin":["binaries/video-intake-fastapi-sidecar"]}}'
+        run: npx tauri build --bundles ${{ matrix.bundles }} --config '{"bundle":{"externalBin":[],"resources":{"binaries/video-intake-fastapi-sidecar":"sidecar"}}}'
         working-directory: frontend
         env:
           # createUpdaterArtifacts makes updater-enabled targets (nsis/msi)
           # require the signing key even for test packages
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      - name: smoke bundled sidecar
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            SIDECAR="$(find frontend/src-tauri/target/release/bundle/macos -type f -path '*/Contents/Resources/sidecar/video-intake-fastapi-sidecar' -print -quit)"
+          else
+            SIDECAR="frontend/src-tauri/target/release/sidecar/video-intake-fastapi-sidecar.exe"
+          fi
+          test -n "$SIDECAR"
+          bash scripts/smoke_bundled_sidecar.sh "$SIDECAR"
       - name: enforce release size budget
         run: python3 scripts/product_readiness_check.py --artifacts frontend/src-tauri/target/release/bundle
       - uses: actions/upload-artifact@v4
