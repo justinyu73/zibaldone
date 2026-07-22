@@ -94,7 +94,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          NOTES_FILE="docs/releases/${TAG#v}.md"
+          NOTES_FILE="docs/releases/v${TAG#v}.md"
           if [ -f "$NOTES_FILE" ]; then
             gh release create "$TAG" --title "Zibaldone $TAG" --notes-file "$NOTES_FILE" 2>/dev/null || true
           else
