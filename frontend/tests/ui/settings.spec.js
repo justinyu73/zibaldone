@@ -57,6 +57,26 @@ test('settings keeps a fixed three-provider CLI inventory with states', async ({
   }
 })
 
+test('settings shows cost status unknown when the backend summary is unavailable', async ({ page }) => {
+  const fixture = makeVault('ytapp-e2e-cost-summary-down')
+  await page.route('**/api/app/cost-summary', async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ detail: 'backend unavailable' }),
+    })
+  })
+  try {
+    await openApp(page, fixture)
+    await page.getByRole('button', { name: '設定' }).click()
+    await expect(page.locator('.settings-command')).toContainText('成本狀態未知')
+    await expect(page.locator('.cost-panel')).toContainText('狀態未知')
+    await expect(page.locator('.cost-panel')).toContainText('無法確認')
+  } finally {
+    fixture.cleanup()
+  }
+})
+
 test('one CLI model registry reaches video, article, and meeting selectors', async ({ page }) => {
   const fixture = makeVault('ytapp-e2e-cli-lanes')
   await page.route('**/api/app/model-options', async (route) => {

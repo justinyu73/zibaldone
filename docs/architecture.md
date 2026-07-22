@@ -45,21 +45,28 @@ The reap in [`lib.rs`](../frontend/src-tauri/src/lib.rs) is therefore two-layere
 
 1. **Recorded-PID reap** — the pid we wrote last run, killed only after a
    process-name check (guards against PID reuse).
-2. **Port sweep** — any process *listening on the sidecar port* is a candidate;
-   each is name-verified as one of our sidecar binaries before being killed.
-   This catches orphans whose pid escaped the file (e.g. the pid file was
-   overwritten by a later spawn while an older sidecar survived).
+2. **Port sweep** — any process *listening on the sidecar port* is a candidate.
+   Current PyInstaller sidecars are name-verified before being killed. A legacy
+   Python/uvicorn launcher is eligible only when both its command identifies the
+   legacy sidecar and its public loopback health response has the Zibaldone
+   fingerprint; an arbitrary Python or HTTP process is never sufficient. This
+   catches orphans whose pid escaped the file (e.g. the pid file was overwritten
+   by a later spawn while an older sidecar survived).
 
 Spawn differs by build: **dev** launches a source-backed shell sidecar via Tauri's
 `externalBin` (no rebuild between edits); **release** resolves the onedir executable
 under the app's resource dir and spawns it directly with `std::process` — the shell
 capability scope can't statically express a per-machine resource path, so this
-mirrors `open_log_dir`'s intentional Rust-side `Command`. Reaping stays identical
-across both: it keys off the recorded pid, name-verified.
+mirrors `open_log_dir`'s intentional Rust-side `Command`. Reaping uses the same
+protected ownership rule across both modes: current binary name, or legacy
+launcher command plus the Zibaldone health fingerprint.
 
 The same philosophy covers updates: installing kills the sidecar first (Windows
 file locks), and a failed install **respawns** it so the session keeps a working
 backend. All of this is under `cargo test --lib`.
+The package and release workflows additionally start the sidecar copied into the
+desktop bundle, then prove `/api/health` and the session-protected cost API before
+an artifact may proceed to the size or upload gates.
 
 ## Request pipeline
 

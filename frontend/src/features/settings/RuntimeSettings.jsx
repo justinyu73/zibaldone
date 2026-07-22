@@ -14,6 +14,8 @@ export default function RuntimeSettings({
   const cliInventory = modelOptions?.cli_inventory || []
   const cliEnabled = Boolean(runtime?.cli_providers_enabled)
   const hasUnsavedChanges = runtimeSaved === false
+  const costKnown = cost != null
+  const costBlocked = Boolean(cost?.over_daily_cap)
 
   return (
     <section className="panel settings-panel cost-panel">
@@ -21,13 +23,15 @@ export default function RuntimeSettings({
         <div><Coins size={16} /><h3>用量與成本</h3></div>
         <div className="row">
           <button className="ghost" onClick={() => { refreshCost(); refreshRuntime() }}>重新整理用量</button>
-          <span className={cost?.over_daily_cap ? 'state-chip error' : 'state-chip ok'}>{cost?.over_daily_cap ? '付費已擋' : '額度內'}</span>
+          <span className={`state-chip ${!costKnown ? 'info' : costBlocked ? 'error' : 'ok'}`}>
+            {!costKnown ? '狀態未知' : costBlocked ? '付費已擋' : '額度內'}
+          </span>
         </div>
       </div>
       <div className="cost-grid">
         <div className="cost-stat"><div className="cost-stat-label">今日花費</div><div className="cost-stat-value">${cost?.today_usd ?? '—'}</div><div className="muted">{cost?.today_calls ?? 0} 次呼叫</div></div>
         <div className="cost-stat"><div className="cost-stat-label">累計花費</div><div className="cost-stat-value">${cost?.total_usd ?? '—'}</div><div className="muted">{cost?.total_calls ?? 0} 次呼叫</div></div>
-        <div className="cost-stat"><div className="cost-stat-label">每日上限</div><div className="cost-stat-value">${cost?.daily_cap_usd ?? '—'}</div><div className={cost?.over_daily_cap ? 'state-chip error' : 'state-chip neutral'}>{cost?.over_daily_cap ? '已達上限' : '可執行'}</div></div>
+        <div className="cost-stat"><div className="cost-stat-label">每日上限</div><div className="cost-stat-value">${cost?.daily_cap_usd ?? '—'}</div><div className={`state-chip ${!costKnown ? 'info' : costBlocked ? 'error' : 'neutral'}`}>{!costKnown ? '無法確認' : costBlocked ? '已達上限' : '可執行'}</div></div>
       </div>
       {cost?.by_provider && Object.keys(cost.by_provider).length > 0 && (
         <div className="provider-breakdown">
