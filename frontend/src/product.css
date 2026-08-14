@@ -194,7 +194,7 @@ button.danger-ghost svg { stroke: currentColor; }
 .yt-thumb:hover::after { background: rgba(0,0,0,0.32); }
 .yt-thumb-play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; opacity: 0.92; z-index: 1; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
 .yt-thumb-hint { position: absolute; right: 10px; bottom: 10px; z-index: 1; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 7px; background: rgba(0,0,0,0.62); color: #fff; font-size: 12px; }
-.overwrite-ask { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.overwrite-ask, .ocr-consent-ask { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
 .provider-breakdown { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; font-size: 12px; }
 .provider-chip { padding: 4px 8px; border-radius: 7px; background: var(--chip, var(--inset)); color: var(--ink-2); }
 .video-info { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }

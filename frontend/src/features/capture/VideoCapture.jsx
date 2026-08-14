@@ -41,6 +41,7 @@ export default function VideoCapture({ settings, adoptUrl = '', ready }) {
   const [overwriteAsk, setOverwriteAsk] = useState(false)
   const [ffmpegReady, setFfmpegReady] = useState(null) // null=unknown, false, true
   const [asrReady, setAsrReady] = useState(null) // null=unknown, false, true
+  const [ocrConsentAsk, setOcrConsentAsk] = useState(false)
   const noCaptions = Boolean(fetched && !enText && !zhText)
   // ASR/OCR need ffmpeg; check readiness when the no-caption fallback appears so we
   // can offer a one-time download instead of failing with "ffmpeg missing".
@@ -176,9 +177,26 @@ export default function VideoCapture({ settings, adoptUrl = '', ready }) {
   }
 
   // OCR（rung 3）：無字幕且畫面有硬字幕時，讀 6 幀畫面文字。本機優先；有 key 時才用雲端視覺 OCR。
+  // production_extractor.py decides local vs. cloud from OPENAI_API_KEY at call
+  // time, so this re-checks live status on every click (not cached at mount —
+  // a key added in Settings mid-session must not go stale) and asks for consent
+  // on anything other than a confirmed "no key": a failed check must never
+  // silently let frames upload without consent.
   async function runVideoOcr() {
     if (notReady()) return
     if (!extractVideoId(url)) return setStatus({ type: 'error', message: '請先輸入有效 URL' })
+    setBusy('ocr')
+    try {
+      const s = await apiFetch('/provider-runtime/status').then((r) => r.json())
+      if (s.openai_api_key_present !== false) { setBusy(''); setOcrConsentAsk(true); return }
+    } catch {
+      setBusy(''); setOcrConsentAsk(true); return
+    }
+    await doRunVideoOcr()
+  }
+
+  async function doRunVideoOcr() {
+    setOcrConsentAsk(false)
     setBusy('ocr'); setStatus({ type: 'info', message: '讀取影片畫面硬字幕（本機 OCR；有 API key 時可用雲端視覺 OCR）...' })
     try {
       const data = await postJson('/production-extractor', {
@@ -380,6 +398,15 @@ export default function VideoCapture({ settings, adoptUrl = '', ready }) {
                       <button onClick={runVideoAsr} disabled={busy === 'asr'}><Captions size={16} />{busy === 'asr' ? '轉錄中...' : '下載音檔並轉錄（ASR）'}</button>
                     )}
                     <button onClick={runVideoOcr} disabled={busy === 'ocr'}><FileText size={16} />{busy === 'ocr' ? '讀取中...' : '讀畫面硬字幕（OCR）'}</button>
+                  </div>
+                )}
+                {ocrConsentAsk && (
+                  <div className="status info ocr-consent-ask" role="group" aria-label="雲端 OCR 上傳確認">
+                    <span>偵測到已設定 OpenAI API 金鑰：確認後，這次「讀畫面硬字幕」會把擷取到的影片畫面上傳到 OpenAI 進行雲端 OCR。</span>
+                    <div className="row">
+                      <button className="ghost" onClick={() => setOcrConsentAsk(false)}>取消</button>
+                      <button className="primary" onClick={doRunVideoOcr} disabled={busy === 'ocr'}>{busy === 'ocr' ? '上傳並讀取中...' : '確認上傳並讀取'}</button>
+                    </div>
                   </div>
                 )}
               </div>
