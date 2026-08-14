@@ -32,19 +32,39 @@ async function apiSessionToken() {
   return apiSessionTokenPromise
 }
 
+// Sidecar being unreachable used to hang fetch() until the connection layer
+// itself gave up (or never — see win-asr-ocr-hardsub-recovery root cause).
+// Default covers the slowest normal call (OCR's enforced 240s server-side
+// ceiling) with margin; callers with a legitimately longer single request
+// (e.g. video ASR transcription of a long video) pass a bigger timeoutMs.
+// 0/null opts out entirely.
+const DEFAULT_TIMEOUT_MS = 300000
+
 export async function apiFetch(url, options = {}) {
   const token = await apiSessionToken()
-  const headers = new Headers(options.headers || {})
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, headers: rawHeaders, ...rest } = options
+  const headers = new Headers(rawHeaders || {})
   if (token) headers.set(API_SESSION_HEADER, token)
   const target = typeof url === 'string' && url.startsWith('/') ? `${API}${url}` : url
-  return fetch(target, { ...options, headers })
+  if (!timeoutMs) return fetch(target, { ...rest, headers })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(target, { ...rest, headers, signal: controller.signal })
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error(`請求逾時（超過 ${Math.round(timeoutMs / 1000)} 秒），請確認應用程式仍在執行`)
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
-export async function postJson(path, body) {
+export async function postJson(path, body, options = {}) {
   const response = await apiFetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    ...options,
   })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {

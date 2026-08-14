@@ -10,11 +10,21 @@ import SummaryModelPicker from '../../components/model/SummaryModelPicker'
 import NoteFields from '../../components/note/NoteFields'
 import { draftFromSource, draftFromSummary, draftToAiSummary, emptyDraft, extractVideoId } from '../../app/noteDraft'
 
-export default function VideoCapture({ settings, adoptUrl = '' }) {
+export default function VideoCapture({ settings, adoptUrl = '', ready }) {
   const paths = deriveVaultPaths(settings.vaultRoot)
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState('')
   const [status, setStatus] = useState(null)
+  // Sidecar boots after the webview (or can crash mid-session); every action below
+  // that hits the API short-circuits here first instead of letting the request fire
+  // into a dead connection ("Failed to fetch" with no actionable message).
+  function notReady() {
+    if (ready === false) {
+      setStatus({ type: 'error', message: '後端服務尚未就緒，請稍候再試；若持續發生，請重新啟動應用程式。' })
+      return true
+    }
+    return false
+  }
   useEffect(() => {
     if (!adoptUrl) return
     setUrl(adoptUrl)
@@ -30,19 +40,32 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
   const [costs, setCosts] = useState(null) // { quick, deep } estimates
   const [overwriteAsk, setOverwriteAsk] = useState(false)
   const [ffmpegReady, setFfmpegReady] = useState(null) // null=unknown, false, true
+  const [asrReady, setAsrReady] = useState(null) // null=unknown, false, true
   const noCaptions = Boolean(fetched && !enText && !zhText)
   // ASR/OCR need ffmpeg; check readiness when the no-caption fallback appears so we
   // can offer a one-time download instead of failing with "ffmpeg missing".
   useEffect(() => {
-    if (!noCaptions) return undefined
+    if (!noCaptions || !ready) return undefined
     let cancelled = false
     apiFetch('/app/ffmpeg/status').then((r) => r.json())
       .then((s) => { if (!cancelled) setFfmpegReady(Boolean(s.ready)) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [noCaptions])
+  }, [noCaptions, ready])
+
+  // ASR (whisper.cpp) is a separate runtime from ffmpeg — OCR doesn't need it, only
+  // the ASR button does. Same first-use download shape as ffmpeg above.
+  useEffect(() => {
+    if (!noCaptions || !ready) return undefined
+    let cancelled = false
+    apiFetch('/app/asr-runtime/status').then((r) => r.json())
+      .then((s) => { if (!cancelled) setAsrReady(Boolean(s.ready)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [noCaptions, ready])
 
   async function installFfmpeg() {
+    if (notReady()) return
     setBusy('ffmpeg'); setStatus({ type: 'info', message: '下載媒體工具（ffmpeg/ffprobe）中，一次性…' })
     try {
       await postJson('/app/ffmpeg/install', {})
@@ -56,6 +79,24 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
       throw new Error('下載逾時')
     } catch (e) {
       setStatus({ type: 'error', message: `媒體工具下載失敗：${e.message}` })
+    } finally { setBusy('') }
+  }
+
+  async function installAsrRuntime() {
+    if (notReady()) return
+    setBusy('asr-runtime'); setStatus({ type: 'info', message: '下載語音轉錄元件（whisper.cpp，約 150MB）中，一次性…' })
+    try {
+      await postJson('/app/asr-runtime/install', {})
+      for (let i = 0; i < 300; i++) {
+        await new Promise((r) => setTimeout(r, 1500))
+        const s = await apiFetch('/app/asr-runtime/status').then((r) => r.json())
+        if (s.ready) { setAsrReady(true); setStatus({ type: 'ok', message: '語音轉錄元件已就緒，可用 ASR。' }); return }
+        const err = s.download?.error
+        if (err) throw new Error(err)
+      }
+      throw new Error('下載逾時')
+    } catch (e) {
+      setStatus({ type: 'error', message: `語音轉錄元件下載失敗：${e.message}` })
     } finally { setBusy('') }
   }
 
@@ -85,6 +126,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
 
   // ① 預覽 — 播放器秒開（client-side）+ lean 免費估價（只抓字幕算字數，跳過繁簡轉換等重活）。
   async function preview() {
+    if (notReady()) return
     const vid = extractVideoId(url)
     if (!vid) return setStatus({ type: 'error', message: '無法辨識 YouTube 網址或影片 ID' })
     setVideoId(vid); setFetched(null); setEnText(''); setZhText(''); setCosts(null); setStatus(null)
@@ -99,6 +141,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
 
   // ② 抓取字幕 — 完整 /api/fetch（含繁簡轉換，供編輯與摘要）。
   async function fetchCaptions() {
+    if (notReady()) return
     if (!extractVideoId(url)) return setStatus({ type: 'error', message: '請先輸入有效 URL' })
     setBusy('fetch'); setStatus({ type: 'info', message: '抓取字幕中（長影片較久）...' })
     try {
@@ -116,10 +159,13 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
   // 無字幕 fallback（收斂在影片筆記流程內，非獨立分頁）：使用者明確觸發。
   // ASR：下載音檔→本機 whisper 轉錄；轉錄稿當原文字幕，續走既有 translate→summarize。
   async function runVideoAsr() {
+    if (notReady()) return
     if (!extractVideoId(url)) return setStatus({ type: 'error', message: '請先輸入有效 URL' })
     setBusy('asr'); setStatus({ type: 'info', message: '下載音檔並本機轉錄中（長影片較久，離線免金鑰）...' })
     try {
-      const data = await postJson('/app/video-audio-asr', { url })
+      // Long videos can legitimately run well past the default apiFetch timeout —
+      // whisper.cpp transcription has no server-side cap, unlike OCR's 240s.
+      const data = await postJson('/app/video-audio-asr', { url }, { timeoutMs: 1800000 })
       const t = (data.transcript || '').trim()
       if (!t) throw new Error('轉錄結果為空（此來源可能無可辨識語音）')
       setEnText(t); setLang('en')
@@ -131,6 +177,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
 
   // OCR（rung 3）：無字幕且畫面有硬字幕時，讀 6 幀畫面文字。本機優先；有 key 時才用雲端視覺 OCR。
   async function runVideoOcr() {
+    if (notReady()) return
     if (!extractVideoId(url)) return setStatus({ type: 'error', message: '請先輸入有效 URL' })
     setBusy('ocr'); setStatus({ type: 'info', message: '讀取影片畫面硬字幕（本機 OCR；有 API key 時可用雲端視覺 OCR）...' })
     try {
@@ -157,6 +204,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
   // ③ 生成草稿 — 需要時先翻譯字幕為中文，再摘要；沒有可用 AI 時仍
   // 建立可編輯的證據草稿，避免「本次跳過下載」變成整條收錄流程死路。
   async function generateDraft() {
+    if (notReady()) return
     if (!(enText || zhText)) return setStatus({ type: 'error', message: '請先「抓取字幕」' })
     setBusy('draft')
     try {
@@ -215,6 +263,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
   }
 
   async function doSave(saveMode) {
+    if (notReady()) return
     setOverwriteAsk(false)
     setBusy('save'); setStatus({ type: 'info', message: saveMode === 'update_ai' ? '覆寫更新筆記...' : '存入筆記...' })
     try {
@@ -325,7 +374,11 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
                   </div>
                 ) : (
                   <div className="panel-actions">
-                    <button onClick={runVideoAsr} disabled={busy === 'asr'}><Captions size={16} />{busy === 'asr' ? '轉錄中...' : '下載音檔並轉錄（ASR）'}</button>
+                    {asrReady === false ? (
+                      <button className="primary" onClick={installAsrRuntime} disabled={busy === 'asr-runtime'}><Download size={16} />{busy === 'asr-runtime' ? '下載中…' : '下載語音轉錄元件（約 150MB・一次性）'}</button>
+                    ) : (
+                      <button onClick={runVideoAsr} disabled={busy === 'asr'}><Captions size={16} />{busy === 'asr' ? '轉錄中...' : '下載音檔並轉錄（ASR）'}</button>
+                    )}
                     <button onClick={runVideoOcr} disabled={busy === 'ocr'}><FileText size={16} />{busy === 'ocr' ? '讀取中...' : '讀畫面硬字幕（OCR）'}</button>
                   </div>
                 )}

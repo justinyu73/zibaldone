@@ -257,3 +257,22 @@ def app_ffmpeg_install():
         return ffmpeg_runtime.start_install()
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/api/app/asr-runtime/status")
+def app_asr_runtime_status():
+    # 本地語音轉錄 runtime（whisper.cpp 執行檔＋base 模型）就緒狀態＋首用下載進度。
+    import asr_runtime
+
+    return asr_runtime.status()
+
+
+@router.post("/api/app/asr-runtime/install")
+def app_asr_runtime_install():
+    # 首用下載 whisper.cpp 執行檔＋base 模型（背景執行緒，UI 輪詢 /asr-runtime/status）。
+    import asr_runtime
+
+    try:
+        return asr_runtime.start_install()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc

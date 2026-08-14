@@ -13,6 +13,7 @@ GET /api/app/config
 GET /api/app/cost-breakdown
 GET /api/app/cost-summary
 GET /api/app/agent-index/status
+GET /api/app/asr-runtime/status
 GET /api/app/ffmpeg/status
 GET /api/app/health
 GET /api/app/inbox
@@ -47,6 +48,7 @@ POST /api/app/api-key-clear
 POST /api/app/api-key-test
 POST /api/app/agent-index
 POST /api/app/article-fetch
+POST /api/app/asr-runtime/install
 POST /api/app/article-save
 POST /api/app/caption-probe
 POST /api/app/capture-inbox-dismiss
@@ -105,7 +107,7 @@ class ApiSurfaceContractTests(unittest.TestCase):
         }
 
         self.assertSetEqual(actual, EXPECTED_API_SURFACE)
-        self.assertEqual(len(actual), 81)
+        self.assertEqual(len(actual), 83)
 
 
 if __name__ == "__main__":
