@@ -124,6 +124,23 @@ class EndToEndRealLocalAsrTests(unittest.TestCase):
         self.assertIn("country", text.lower())
 
 
+class AsrRuntimeNotReadyMessageTests(unittest.TestCase):
+    """gap B2 — pin the packaged-app-safe not-ready message and guard against
+    regressing back to telling the user to run a dev shell script. Same gate
+    backs both the video-lane ASR button (video_audio_asr.py) and meeting
+    audio's local tier, so fixing/testing it here covers both callers."""
+
+    def test_message_points_at_in_app_install_not_a_dev_script(self):
+        with mock.patch.object(M, "_local_asr_runtime_readiness", return_value={"runtime_ready": False}):
+            with self.assertRaises(ValueError) as ctx:
+                M._meeting_asr_local(Path("/nonexistent.wav"))
+
+        message = str(ctx.exception)
+        self.assertEqual(message, "本地語音轉錄環境尚未就緒（可在收錄頁按「下載語音轉錄元件」一鍵安裝，或改用雲端 ASR）")
+        for banned in ("setup_asr_runtime.sh", "cmake", "make", "cc", "g++", "git clone", "git ", "編譯"):
+            self.assertNotIn(banned, message)
+
+
 class LocalAsrModelResolveTests(unittest.TestCase):
     """base 用 runtime-lock 的模型；medium 用同目錄較大模型，缺檔則明確報錯（不靜默退回）。"""
 

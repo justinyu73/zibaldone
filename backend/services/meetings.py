@@ -206,7 +206,7 @@ def _meeting_asr_local(path: Path, language: str = "auto", asr_model: str = "bas
 
     readiness = _local_asr_runtime_readiness()
     if readiness.get("runtime_ready") is not True:
-        raise ValueError("本地語音轉錄環境尚未就緒（缺 whisper.cpp，請跑 setup_asr_runtime.sh 或改用雲端 ASR）")
+        raise ValueError("本地語音轉錄環境尚未就緒（可在收錄頁按「下載語音轉錄元件」一鍵安裝，或改用雲端 ASR）")
     result = transcribe(
         str(path),
         binary_path=str(readiness.get("binary", {}).get("path") or ""),

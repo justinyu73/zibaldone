@@ -140,7 +140,7 @@ export default function ProductApp() {
           {/* 掛載策略（P1 lazy mount）：草稿/狀態型 tab 用 CSS 隱藏保留掛載（capture=收錄草稿、
               inbox=餵 nav badge 計數、settings=表單防丟）；view 型重 tab（library 啟動掃 vault、
               cost/retire）改 active 才掛載，避免大型 vault 啟動同時觸發多組磁碟/API 掃描。 */}
-          <div style={{ display: tab === 'capture' ? 'block' : 'none' }}><CaptureWorkspace settings={settings} adopt={adopt} /></div>
+          <div style={{ display: tab === 'capture' ? 'block' : 'none' }}><CaptureWorkspace settings={settings} adopt={adopt} ready={backendReady} /></div>
           <div style={{ display: tab === 'inbox' ? 'block' : 'none' }}><InboxView settings={settings} active={tab === 'inbox'} onCount={setInboxCount} onGo={setTab} ready={backendReady} onAdopt={(url, kind = 'article') => { setAdopt({ url, kind }); setTab('capture') }} /></div>
           {tab === 'library' && <LibraryView settings={settings} onGo={setTab} ready={backendReady} />}
           {tab === 'cost' && <CostView active />}
