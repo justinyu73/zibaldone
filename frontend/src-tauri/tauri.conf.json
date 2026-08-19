@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Zibaldone",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "identifier": "io.github.justinyu73.zibaldone",
   "build": {
     "frontendDist": "../dist",
@@ -43,7 +43,10 @@
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
         "installMode": "currentUser",
-        "languages": ["TradChinese", "English"],
+        "languages": [
+          "TradChinese",
+          "English"
+        ],
         "displayLanguageSelector": false,
         "startMenuFolder": "YT Note App"
       }
