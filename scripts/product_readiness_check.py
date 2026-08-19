@@ -39,11 +39,15 @@ FORBIDDEN_TRACKED_NAMES = {
     "config.json",
 }
 ARTIFACT_SUFFIXES = (".dmg", ".exe", ".app.tar.gz")
-# Windows NSIS is kept at the original 110 MB hard cap. macOS bundles include
-# the same onedir Python sidecar but compress materially less efficiently, so
-# their measured release artifacts need a separate, still bounded budget.
-WARN_WINDOWS_ARTIFACT_BYTES = 95_000_000
-MAX_WINDOWS_ARTIFACT_BYTES = 110_000_000
+# Windows NSIS was kept at the original 110 MB hard cap until v0.8.8: the
+# keyless local OCR lane (RapidOCR models + onnxruntime inside the sidecar)
+# added ~15 MB of permanent product value, moving the measured artifact to
+# ~111.6 MB. The cap is raised to 115 MB to fit that feature; macOS bundles
+# include the same onedir Python sidecar but compress materially less
+# efficiently, so their measured release artifacts need a separate, still
+# bounded budget.
+WARN_WINDOWS_ARTIFACT_BYTES = 100_000_000
+MAX_WINDOWS_ARTIFACT_BYTES = 115_000_000
 WARN_MACOS_ARTIFACT_BYTES = 160_000_000
 MAX_MACOS_ARTIFACT_BYTES = 200_000_000
 MAX_TRACKED_SOURCE_BYTES = 25_000_000
