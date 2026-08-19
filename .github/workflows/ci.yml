@@ -29,6 +29,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r backend/requirements.txt
+      - run: bash scripts/use_headless_opencv.sh
       - run: ./run_tests.sh
         working-directory: backend
 
@@ -62,6 +63,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg  # asr.spec.js 合成測試音檔 + 後端 preflight 需要
       - run: pip install -r backend/requirements.txt
+      - run: bash scripts/use_headless_opencv.sh
       - run: npm ci
         working-directory: frontend
       - run: npx playwright install --with-deps chromium
