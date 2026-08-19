@@ -1,9 +1,9 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: 1b9ee47
+last_commit: 02a4431
 branch: agent/public-release-0-8-4
-last_stage: v0.8.8 released — Windows/macOS installers published (win 111.6MB under new 115MB cap); captionless-video ASR/OCR repaired end to end
+last_stage: OCR split into first-use downloadable pack merged (#27) — main sidecar 417→240MB raw; v0.8.9 released (headless swap, no installer effect)
 status: PASS
-next_action: macOS app.tar.gz is 199.8MB against the 200MB cap — plan installer diet (OCR models to first-use download) before v0.9; package.yml mac smoke is a chronic dmg-only false failure worth fixing separately
+next_action: release v0.9.0 (OCR pack is a feature-level change: first local-OCR use downloads ~150MB); confirm win/mac installer sizes from that release
 open_questions: []
