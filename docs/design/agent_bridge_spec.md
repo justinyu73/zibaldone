@@ -6,7 +6,9 @@ reference for the agent-readable projection pattern,
 not a replacement source, runtime, or product direction for Zibaldone. The
 description of OpenWiki in this file was re-verified on 2026-07-21 and has since
 widened. `ZIB-AB-002-A` below is now the active additive format decision;
-`ZIB-AB-002-B` and `ZIB-AB-002-C` remain unselected.
+`ZIB-AB-002-B` remains unselected (its op-demo verification by headless CLI is
+already decided); `ZIB-AB-002-C` is closed — downgraded to a provenance-field
+extension of A (2026-07-24).
 
 **Authority:** detailed contract for [`ZIB-AB-001`](../architecture.md#zib-ab-001).
 The architecture map is the canonical entrypoint; this file owns only the
@@ -100,7 +102,8 @@ preserving the v1 local-only, metadata-only, disposable projection boundary.
 <a id="zib-ab-002"></a>
 ## ZIB-AB-002 — OpenWiki / OKF comparison and v2 candidates
 
-**Status:** `ZIB-AB-002-A` adopted (2026-07-22); B and C remain research/open.
+**Status:** `ZIB-AB-002-A` adopted (2026-07-22); B remains research/open;
+C closed (2026-07-24) — downgraded to a provenance-field extension of A.
 Map entry:
 [`ZIB-ARCH-001`](../architecture.md#zib-ab-002). Everything in this section is a
 candidate or an open question unless explicitly marked as the active A
@@ -125,11 +128,19 @@ explicit-confirmation gate remain in force.
   `note`; no source note is rewritten.
 - Concept files carry metadata and a link back to the vault-relative source;
   note bodies are never copied. The root index links to the concepts.
+- Concepts derived from notes that passed the human review gate additionally
+  carry projection-only provenance fields in frontmatter: source URL, `[mm:ss]`
+  anchor, ASR engine, and a human-reviewed flag. These fields are derived
+  deterministically from existing note metadata and are never written back to
+  source notes. This increment is what remains of `ZIB-AB-002-C`
+  (closed 2026-07-24); its positioning change and any LLM concept synthesis
+  stay excluded.
 - New runs do not create `manifest.json`. A previously generated Zibaldone
   manifest is removed only during an explicit confirmed migration; a foreign
   manifest or foreign Markdown output is protected and rejects the write.
-- B (activation/increment) and C (evidence-anchored concept profile) are not
-  included. They require separate decisions and acceptance evidence.
+- B (activation/increment) is not included. It requires a separate decision
+  and acceptance evidence. C is closed: its safe increment lives in the
+  provenance fields above.
 
 ### Fact correction on the v1 reference
 
@@ -203,12 +214,19 @@ read only what moved since the last run.
 territory and must inherit the v1 generated-marker protection rule (never
 overwrite a foreign file). Its acceptance is not verifiable inside Zibaldone —
 the op-demo has to be external: open a coding agent in the vault, ask a
-question, observe it cite the index.
+question, observe it cite the index. The verification method is decided
+(2026-07-24): headless CLI execution (e.g. `claude -p`, `codex exec`) with an
+assertion that the answer cites the index — not Playwright, which cannot
+observe terminal-based agents.
 
-**C — Evidence-anchored concept profile.** Position Zibaldone as the OKF
-producer whose concepts carry verifiable source anchors: source URL, `[mm:ss]`,
-ASR engine, human-reviewed flag. OKF asks relations to be evidence-backed;
-Zibaldone holds literal evidence.
+**C — Evidence-anchored concept profile (closed 2026-07-24 — not adopted as a
+standalone profile).** Its safe increment — provenance anchors on
+review-gated concepts — is folded into `ZIB-AB-002-A` as projection-only
+frontmatter fields; the positioning change and any LLM concept synthesis
+remain excluded. Original candidate text kept for the record: position
+Zibaldone as the OKF producer whose concepts carry verifiable source anchors
+(source URL, `[mm:ss]`, ASR engine, human-reviewed flag); OKF asks relations
+to be evidence-backed and Zibaldone holds literal evidence.
 *Tradeoffs:* this is a positioning change, not a feature. Introducing LLM
 concept synthesis would collide with both hard rules — "no timestamp, no claim"
 and the human review gate — by putting unattributed derived claims next to
@@ -225,11 +243,22 @@ format is not a reason to adopt its runtime.
 
 ### Open questions
 
-1. Should B (activation and increment) be selected separately from A?
-2. Should C (evidence-anchored concept profile) be selected separately from A?
+1. ~~Should B (activation and increment) be selected separately from A?~~
+   Resolved 2026-07-24: yes. A is closed on its own; B needs a separate
+   decision and its own external evidence.
+2. ~~Should C (evidence-anchored concept profile) be selected separately from
+   A?~~ Resolved 2026-07-24: C is not adopted as a standalone profile; its
+   safe increment is folded into A as projection-only provenance fields.
 3. If B: where does the instruction pointer live so it neither collides with a
    user's own agent instruction file nor requires a watcher to stay current?
-4. Does an OKF bundle change the disposability guarantee — is the projection
-   still safe to delete and regenerate once external tools consume it?
-5. Should the Session Hub strategy summary and handoff pointer be refreshed once
-   this research closes, or only when a candidate is adopted?
+   Open; current preference (2026-07-24): the projection's root index carries
+   the agent-facing instructions itself, and Settings offers a copyable
+   snippet for users who want it in their own `AGENTS.md` — no writes into
+   user-authored root files, no watcher.
+4. ~~Does an OKF bundle change the disposability guarantee?~~ Resolved
+   2026-07-24: no. External consumers must treat the bundle as a read-only,
+   regenerable cache; Zibaldone guarantees re-generation from the vault, not
+   cross-version bundle stability.
+5. ~~Should the Session Hub strategy summary and handoff pointer be refreshed
+   once this research closes, or only when a candidate is adopted?~~ Resolved
+   2026-07-24: refresh only when a candidate is adopted, not during research.

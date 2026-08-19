@@ -73,6 +73,27 @@ Windows/macOS 安裝檔是 GitHub Actions 在對應原生 runner 建置的公開
 一般使用不需要 WSL、Python、Node 或手動啟動 FastAPI。Intel Mac 目前沒有公開
 安裝檔；Linux 目前請依開發文件自行建置。
 
+### macOS 未簽章版快速安裝
+
+安裝檔未經 Apple Developer ID 簽章與公證。打開 DMG、把 Zibaldone 拖進
+「應用程式」後，在終端機執行一次以下指令，移除這個 App 的隔離標記
+（否則 Gatekeeper 會顯示「App 已損毀，無法打開」）：
+
+```sh
+xattr -r -d com.apple.quarantine "/Applications/Zibaldone.app"
+```
+
+可選：安裝前先驗證 SHA-256。在 DMG 所在目錄（例如 `~/Downloads`）下載
+Release 內的 `SHA256SUMS-macos-latest.txt` 後執行（把 `0.8.6` 換成要安裝的
+版本號）：
+
+```sh
+cd ~/Downloads
+grep 'Zibaldone_0.8.6_aarch64.dmg' SHA256SUMS-macos-latest.txt | sed 's|dmg/||' | shasum -a 256 -c -
+```
+
+輸出 `Zibaldone_0.8.6_aarch64.dmg: OK` 即表示檔案完整。
+
 ### 安裝前的風險與信任邊界
 
 這是開源、未購買商業憑證的個人產品：

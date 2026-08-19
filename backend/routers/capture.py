@@ -437,6 +437,6 @@ def app_video_audio_asr(req: VideoAudioAsrReq):
     import video_audio_asr
 
     try:
-        return video_audio_asr.transcribe_youtube_audio(req.url, asr_model=req.asr_model or "small")
+        return video_audio_asr.transcribe_youtube_audio(req.url, asr_model=req.asr_model or "base")
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc

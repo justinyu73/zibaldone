@@ -22,7 +22,12 @@ def _engine() -> Any:
         raise LocalOcrUnavailable(
             "本機 OCR 尚未安裝；請安裝 rapidocr-onnxruntime，或設定 OPENAI_API_KEY 使用雲端 OCR"
         ) from exc
-    _ENGINE = RapidOCR()
+    try:
+        _ENGINE = RapidOCR()
+    except Exception as exc:  # noqa: BLE001 — missing model data / broken onnxruntime must surface as guidance, not a bare 500
+        raise LocalOcrUnavailable(
+            f"本機 OCR 引擎初始化失敗（{exc}）；請重新安裝 rapidocr-onnxruntime，或設定 OPENAI_API_KEY 使用雲端 OCR"
+        ) from exc
     return _ENGINE
 
 

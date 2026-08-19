@@ -187,7 +187,9 @@ class AsrModelDownloadReq(BaseModel):
 
 class VideoAudioAsrReq(BaseModel):
     url: str
-    asr_model: str = "small"
+    # base = the model setup_asr_runtime.sh / whisper_runtime install actually
+    # provisions; small/medium require a separate manual model download.
+    asr_model: str = "base"
 
 
 class SourceToNoteReq(BaseModel):

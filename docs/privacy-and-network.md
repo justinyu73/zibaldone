@@ -27,6 +27,7 @@ operation.
 | AI translation/summary | OpenAI, Anthropic, or Google | User selects a cloud model and executes the action |
 | Local model inference | Loopback built-in llama.cpp (127.0.0.1) | User selects the built-in local model |
 | Built-in model download | llama.cpp release + model host | First-use install of the built-in local runtime |
+| Local ASR engine download | whisper.cpp GitHub Release (engine) + Hugging Face (base model) | User clicks the ASR engine install on a captionless video (Windows/Linux; macOS builds from source) |
 | Update check/download | This project's GitHub Release | User checks for or installs an update |
 | Radar/news scan | Configured feeds, HN, or GitHub | User runs the radar scan |
 

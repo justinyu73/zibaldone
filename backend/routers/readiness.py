@@ -162,7 +162,7 @@ def _local_asr_report_only_probe(
     if not whisper.exists() or not model.exists():
         return _blocked_local_asr_report_only_probe("local_asr_runtime_not_ready", "whisper.cpp binary or model is missing")
 
-    tmp_root = Path(tempfile.mkdtemp(prefix=f"vaultwiki_video_intake_local_asr_{video_id}_", dir="/tmp"))
+    tmp_root = Path(tempfile.mkdtemp(prefix=f"vaultwiki_video_intake_local_asr_{video_id}_"))
     sample_path = tmp_root / "local_asr_sample.wav"
     output_prefix = tmp_root / "local_asr_report"
     errors: list[str] = []

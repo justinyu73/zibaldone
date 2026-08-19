@@ -12,7 +12,8 @@ Verified: 2026-07-22 (live repo audit)
 
 Authority: `docs/design/agent_bridge_spec.md#zib-ab-002`
 Decision: `ZIB-AB-002`
-Status: A selected and implemented; B/C remain unselected
+Status: A selected and implemented; B unselected (op-demo via headless CLI
+decided); C closed as an A provenance-field extension (2026-07-24)
 
 ## TODO
 
@@ -25,6 +26,9 @@ Status: A selected and implemented; B/C remain unselected
 - [x] Add backend, frontend, Playwright, Rust/package, and diff evidence.
 - [x] Select and implement AB-002-A OKF v0.1 projection; keep activation,
       increment, and evidence-profile work out of scope.
+- [ ] Extend the AB-002-A concept frontmatter with projection-only provenance
+      fields (source URL, `[mm:ss]`, ASR engine, human-reviewed flag) for
+      review-gated notes; this increment closes AB-002-C (decided 2026-07-24).
 
 ## Open specification / verification gaps
 

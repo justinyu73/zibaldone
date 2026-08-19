@@ -103,7 +103,9 @@ cooperative cancellation at stage boundaries.
 <a id="zib-ab-002"></a>
 ## ZIB-AB-002 — Agent Bridge v2 research: OpenWiki / OKF alignment
 
-**Status:** `ZIB-AB-002-A` adopted and implemented; B/C remain research/open.
+**Status:** `ZIB-AB-002-A` adopted and implemented; B remains research/open
+(op-demo verification: headless CLI, not Playwright); C closed 2026-07-24,
+downgraded to a provenance-field extension of A.
 [`ZIB-AB-001`](#zib-ab-001) remains the operational boundary.
 
 Re-verified 2026-07-21: OpenWiki has widened past the pattern reference recorded
