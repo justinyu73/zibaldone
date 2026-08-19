@@ -290,26 +290,43 @@ def _ocr_text_from_evidence(provider_evidence: List[Dict[str, Any]]) -> str:
     and collect hard-subtitle / on-screen text lines (deduped), not the raw JSON."""
     lines: List[str] = []
     seen = set()
+
+    def _collect(text: str) -> None:
+        if text and text not in seen:
+            seen.add(text)
+            lines.append(text)
+
+    def _collect_fallback_lines(raw: str) -> None:
+        """Unparseable provider output: keep human-readable lines only — strip
+        fences, JSON structure, and key wrappers so no raw JSON leaks into the
+        caption box."""
+        for line in raw.splitlines():
+            text = line.strip().rstrip(",")
+            if not text or text.startswith("```") or text in ("{", "}", "[", "]"):
+                continue
+            entry = re.match(r'^"text"\s*:\s*"(.*)"$', text)
+            if entry:
+                _collect(entry.group(1).strip())
+                continue
+            if re.match(r'^"[A-Za-z_]+"\s*:', text):
+                continue  # JSON keys: hard_subtitles/screen_text/language/style/position/confidence
+            _collect(text)
+
     for item in provider_evidence:
         raw = str(item.get("text") or "").strip()
         if not raw:
             continue
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        cleaned = re.sub(r"```(?:json)?", "", raw)
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
         try:
-            data = json.loads(match.group(0) if match else raw)
+            data = json.loads(match.group(0) if match else cleaned)
         except (ValueError, TypeError):
-            for line in raw.splitlines():
-                text = line.strip()
-                if text and text not in seen:
-                    seen.add(text)
-                    lines.append(text)
+            _collect_fallback_lines(raw)
             continue
         for key in ("hard_subtitles", "screen_text"):
             for entry in data.get(key) or []:
                 text = (entry if isinstance(entry, str) else str((entry or {}).get("text") or "")).strip()
-                if text and text not in seen:
-                    seen.add(text)
-                    lines.append(text)
+                _collect(text)
     return "\n".join(lines)
 
 
