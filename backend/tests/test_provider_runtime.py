@@ -68,6 +68,15 @@ class RequireRealRuntimeTests(unittest.TestCase):
 
 
 class RuntimeStatusTests(unittest.TestCase):
+    def setUp(self):
+        self._saved = os.environ.get("OPENAI_API_KEY")
+
+    def tearDown(self):
+        if self._saved is None:
+            os.environ.pop("OPENAI_API_KEY", None)
+        else:
+            os.environ["OPENAI_API_KEY"] = self._saved
+
     def test_status_exposes_blocked_scope_and_enabled_tasks(self):
         status = PR.runtime_status()
         self.assertTrue(status["ok"])
@@ -77,6 +86,18 @@ class RuntimeStatusTests(unittest.TestCase):
         # asr + ocr_visual are enabled in enabled_models.json
         self.assertIn("asr", status["enabled_runtime_tasks"])
         self.assertIn("ocr_visual", status["enabled_runtime_tasks"])
+
+    def test_openai_api_key_present_reflects_env_var(self):
+        # VideoCapture.jsx's OCR cloud-upload consent gate reads this exact
+        # field (GET /api/provider-runtime/status) to decide whether to ask
+        # before uploading frames — pin it so a regression here can't silently
+        # break that gate.
+        os.environ.pop("OPENAI_API_KEY", None)
+        self.assertFalse(PR.runtime_status()["openai_api_key_present"])
+        os.environ["OPENAI_API_KEY"] = "sk-test-key"
+        self.assertTrue(PR.runtime_status()["openai_api_key_present"])
+        os.environ["OPENAI_API_KEY"] = "   "
+        self.assertFalse(PR.runtime_status()["openai_api_key_present"])
 
 
 class DryRunReportTests(unittest.TestCase):

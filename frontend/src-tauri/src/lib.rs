@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use rand::{distributions::Alphanumeric, Rng};
@@ -26,6 +26,20 @@ const SIDECAR_RESOURCE_DIR: &str = "sidecar";
 // Must match backend/sidecar_main.py VIDEO_INTAKE_FASTAPI_PORT default.
 const SIDECAR_PORT: u16 = 8766;
 
+// Crash-loop guard for the auto-restart added below: an unexpected sidecar exit
+// (OOM, killed, transient crash) respawns automatically instead of leaving the
+// backend dead for the rest of the session, but a persistent failure (e.g. a
+// corrupted install) must not spin forever. Counter lives on SidecarState and
+// resets to 0 once a restart actually reaches "ready" (note_sidecar_line), so
+// only *consecutive* failures count.
+const MAX_SIDECAR_RESTARTS: u32 = 5;
+
+/// Pure threshold check factored out of the restart handlers so it is
+/// unit-testable without a real child process.
+fn should_auto_restart(attempt_number: u32) -> bool {
+    attempt_number <= MAX_SIDECAR_RESTARTS
+}
+
 // Dev holds the shell plugin's CommandChild; release holds the std::process child
 // of the directly-spawned onedir exe. Reaping is by recorded PID either way, so the
 // handle only serves precise kill of our own child (exit / pre-update).
@@ -34,10 +48,12 @@ type SidecarChild = CommandChild;
 #[cfg(not(debug_assertions))]
 type SidecarChild = std::process::Child;
 
-/// Tracks whether the bundled FastAPI sidecar has reported readiness.
+/// Tracks whether the bundled FastAPI sidecar has reported readiness, plus a
+/// consecutive-restart counter for the crash-loop guard.
 #[derive(Default)]
 struct SidecarState {
     ready: AtomicBool,
+    restarts: AtomicU32,
 }
 
 /// Keeps the spawned sidecar child alive for the app lifetime.
@@ -303,6 +319,9 @@ fn store_sidecar_child(app: &tauri::AppHandle, pid: u32, child: SidecarChild) {
 fn note_sidecar_line(state: &SidecarState, line: &str) {
     if line.contains("Application startup complete") || line.contains("Uvicorn running") {
         state.ready.store(true, Ordering::Relaxed);
+        // A restart just reached healthy — future unrelated crashes get their own
+        // fresh budget instead of inheriting today's earlier failure count.
+        state.restarts.store(0, Ordering::Relaxed);
     }
     log::info!("[sidecar] {}", line.trim_end());
 }
@@ -361,6 +380,7 @@ fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<
     };
     store_sidecar_child(app, child.pid(), child);
 
+    let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
@@ -370,6 +390,19 @@ fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<
                 CommandEvent::Terminated(payload) => {
                     state.ready.store(false, Ordering::Relaxed);
                     log::warn!("[sidecar] terminated: {payload:?}");
+                    // Unexpected exit (crash, OOM, killed) — auto-restart instead of
+                    // leaving the backend dead for the rest of the session, capped so
+                    // a persistent failure can't spin forever.
+                    let attempt = state.restarts.fetch_add(1, Ordering::Relaxed) + 1;
+                    if should_auto_restart(attempt) {
+                        log::warn!("[sidecar] auto-restarting (attempt {attempt}/{MAX_SIDECAR_RESTARTS})");
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        spawn_sidecar(&app_handle, state.clone(), session.clone());
+                    } else {
+                        log::error!(
+                            "[sidecar] giving up after {MAX_SIDECAR_RESTARTS} consecutive restarts — will not auto-restart again this session"
+                        );
+                    }
                 }
                 CommandEvent::Error(err) => log::error!("[sidecar] error: {err}"),
                 _ => {}
@@ -490,12 +523,25 @@ fn spawn_sidecar(app: &tauri::AppHandle, state: Arc<SidecarState>, session: Arc<
     // process gone (mirrors the dev Terminated event); stderr just forwards.
     if let Some(out) = stdout {
         let state = state.clone();
+        let app_handle = app.clone();
+        let session = session.clone();
         std::thread::spawn(move || {
             for line in BufReader::new(out).lines().map_while(Result::ok) {
                 note_sidecar_line(&state, &line);
             }
             state.ready.store(false, Ordering::Relaxed);
             log::warn!("[sidecar] stdout closed (terminated)");
+            // Unexpected exit — auto-restart, capped (mirrors the dev Terminated path).
+            let attempt = state.restarts.fetch_add(1, Ordering::Relaxed) + 1;
+            if should_auto_restart(attempt) {
+                log::warn!("[sidecar] auto-restarting (attempt {attempt}/{MAX_SIDECAR_RESTARTS})");
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                spawn_sidecar(&app_handle, state.clone(), session);
+            } else {
+                log::error!(
+                    "[sidecar] giving up after {MAX_SIDECAR_RESTARTS} consecutive restarts — will not auto-restart again this session"
+                );
+            }
         });
     }
     if let Some(err) = stderr {
@@ -714,5 +760,25 @@ mod tests {
 
         assert_eq!(result, Ok("installed"));
         assert_eq!(recoveries.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn auto_restart_stops_after_max_consecutive_attempts() {
+        assert!(should_auto_restart(1));
+        assert!(should_auto_restart(MAX_SIDECAR_RESTARTS));
+        assert!(!should_auto_restart(MAX_SIDECAR_RESTARTS + 1));
+    }
+
+    #[test]
+    fn note_sidecar_line_resets_restart_counter_on_ready() {
+        let state = SidecarState::default();
+        state.restarts.store(3, Ordering::Relaxed);
+
+        note_sidecar_line(&state, "some unrelated log line");
+        assert_eq!(state.restarts.load(Ordering::Relaxed), 3, "unrelated lines must not reset the counter");
+
+        note_sidecar_line(&state, "INFO:     Application startup complete.");
+        assert_eq!(state.restarts.load(Ordering::Relaxed), 0);
+        assert!(state.ready.load(Ordering::Relaxed));
     }
 }

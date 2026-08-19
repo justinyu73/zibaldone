@@ -12,7 +12,7 @@ const LANES = {
 }
 
 // 收錄 tab：影片網址與本機音檔是同一件事（把來源變筆記）的兩個 lane。
-export default function CaptureWorkspace({ settings, adopt = { url: '', kind: 'article' } }) {
+export default function CaptureWorkspace({ settings, adopt = { url: '', kind: 'article' }, ready }) {
   const [lane, setLane] = useState('url')
   useEffect(() => { if (adopt.url) setLane(adopt.kind === 'video' ? 'url' : 'article') }, [adopt])
   const active = LANES[lane]
@@ -30,7 +30,7 @@ export default function CaptureWorkspace({ settings, adopt = { url: '', kind: 'a
         <div><div className="capture-banner-title">{active.title}</div><div className="capture-banner-desc">{active.desc}</div></div>
       </div>
       {/* all lanes stay mounted so in-progress work survives switching */}
-      <div style={{ display: lane === 'url' ? 'block' : 'none' }}><VideoCapture settings={settings} adoptUrl={adopt.kind === 'video' ? adopt.url : ''} /></div>
+      <div style={{ display: lane === 'url' ? 'block' : 'none' }}><VideoCapture settings={settings} adoptUrl={adopt.kind === 'video' ? adopt.url : ''} ready={ready} /></div>
       <div style={{ display: lane === 'article' ? 'block' : 'none' }}><ArticleCapture settings={settings} adoptUrl={adopt.kind === 'article' ? adopt.url : ''} /></div>
       <div style={{ display: lane === 'audio' ? 'block' : 'none' }}><MeetingAudioView settings={settings} /></div>
     </div>

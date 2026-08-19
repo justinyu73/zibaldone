@@ -113,12 +113,14 @@ def _install_worker(key: str) -> None:
 
 
 def _download_and_extract(tool: str, url: str, sha256: str, state: dict[str, Any]) -> None:
+    from radar import _ssl_context  # certifi context（打包版無系統 CA）
+
     root = _root()
     root.mkdir(parents=True, exist_ok=True)
     tmp_zip = root / f"{tool}.zip.part"
     request = urllib.request.Request(url, headers={"User-Agent": "yt-note-app"})
     digest = hashlib.sha256()
-    with urllib.request.urlopen(request, timeout=60) as resp:
+    with urllib.request.urlopen(request, timeout=60, context=_ssl_context()) as resp:
         state["total"] = int(resp.headers.get("Content-Length") or 0)
         with open(tmp_zip, "wb") as handle:
             while True:

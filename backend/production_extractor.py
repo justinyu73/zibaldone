@@ -27,9 +27,28 @@ CAPS = {
     # as a sanity bound; a 15-min limit needlessly blocked normal long-form videos.
     "max_video_duration_seconds_for_frame_probe": 14400,
     "max_runtime_seconds": 240,
-    # Platform temp dir (Windows has no /tmp; tempfile resolves %TEMP%/TMPDIR).
+    # Platform-independent temp root — "/tmp" doesn't exist on stock Windows
+    # (raises FileNotFoundError before a single frame is sampled). gettempdir()
+    # resolves per-OS (TEMP/TMP env or platform default); _ensure_storage_root()
+    # below also creates it defensively in case a custom TEMP points nowhere.
     "storage_root": tempfile.gettempdir(),
 }
+
+
+def _ensure_storage_root() -> str:
+    root = CAPS["storage_root"]
+    os.makedirs(root, exist_ok=True)
+    return root
+
+
+def _run_local_ocr_safely(local_ocr_fn, data: bytes) -> tuple[str, str]:
+    """Run the local OCR engine on one frame, catching engine failures (corrupt
+    frame bytes, RapidOCR internal errors, …) so one bad frame never aborts the
+    whole multi-frame extraction. Returns (text, error) — error is "" on success."""
+    try:
+        return local_ocr_fn(data), ""
+    except Exception as exc:  # noqa: BLE001 — one bad frame must not abort the whole OCR pass
+        return "", str(exc)[:400]
 
 
 class ProductionExtractorError(RuntimeError):
@@ -413,11 +432,18 @@ def run_production_extractor(
     provider_cache: Dict[str, Dict[str, Any]] = {}
     provider_call_count = 0
     cleanup_verified = False
-    tmp_root = tempfile.mkdtemp(prefix="vaultwiki_yt_api_extract_")
+    tmp_root = tempfile.mkdtemp(prefix="vaultwiki_yt_api_extract_", dir=_ensure_storage_root())
     try:
         local_video = _download_lowres_video(target["canonical_url"], Path(tmp_root))
         stream = _probe(ffprobe, local_video)
         for index, timestamp in enumerate(_timestamps(metadata["duration_seconds"], sample_count), start=1):
+            # max_runtime_seconds was declared but never enforced — a slow-but-not-
+            # individually-hanging sequence of frame/provider calls could run
+            # unbounded. Check wall-clock once per frame so a long OCR pass fails
+            # cleanly instead of holding the client fetch open indefinitely.
+            elapsed = time.perf_counter() - started
+            if elapsed > CAPS["max_runtime_seconds"]:
+                raise ProductionExtractorError(504, f"OCR 逾時（超過 {CAPS['max_runtime_seconds']} 秒），已中止")
             frame_path = Path(tmp_root) / f"frame_{index:02d}.png"
             _run_command(
                 [
@@ -472,15 +498,17 @@ def run_production_extractor(
                 if provider_call_count >= max_provider_calls:
                     raise ProductionExtractorError(400, "provider call cap exceeded")
                 if local_ocr:
+                    ocr_text_value, ocr_error = _run_local_ocr_safely(local_ocr, data)
                     report = {
-                        "status": "local_completed",
+                        "status": "local_completed" if not ocr_error else "local_frame_failed",
                         "provider": "local",
                         "model": "rapidocr-onnxruntime",
-                        "segments": [{"text": local_ocr(data)}],
+                        "segments": [{"text": ocr_text_value}],
                         "provider_call_count": 0,
                         "usage": {"confidence": "not_available"},
                     }
                 else:
+                    ocr_error = ""
                     report = analyze_frame(
                         filename=frame_path.name,
                         image_base64=base64.b64encode(data).decode("ascii"),
@@ -514,6 +542,8 @@ def run_production_extractor(
                         else "report_only_provider_ocr_requires_operator_review"
                     ],
                 }
+                if ocr_error:
+                    evidence["ocr_error"] = ocr_error
                 provider_cache[sha256] = evidence
                 provider_evidence.append(evidence)
             try:

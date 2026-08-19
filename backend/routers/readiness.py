@@ -384,25 +384,6 @@ def app_local_asr_runtime_readiness():
     return _local_asr_runtime_readiness()
 
 
-@router.get("/api/app/local-asr-runtime/install-status")
-def app_local_asr_runtime_install_status():
-    import whisper_runtime
-
-    return whisper_runtime.status()
-
-
-@router.post("/api/app/local-asr-runtime/install")
-def app_local_asr_runtime_install():
-    # First-use download of the prebuilt whisper.cpp CLI + ggml-base model
-    # (user-explicit action; same trust pattern as the ffmpeg install).
-    import whisper_runtime
-
-    try:
-        return whisper_runtime.start_install()
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
 @router.get("/api/app/retained-artifacts")
 def app_state_retained_artifacts(workspace_root: str):
     try:

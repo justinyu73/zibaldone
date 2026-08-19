@@ -13,11 +13,11 @@ GET /api/app/config
 GET /api/app/cost-breakdown
 GET /api/app/cost-summary
 GET /api/app/agent-index/status
+GET /api/app/asr-runtime/status
 GET /api/app/ffmpeg/status
 GET /api/app/health
 GET /api/app/inbox
 GET /api/app/local-asr-model/status
-GET /api/app/local-asr-runtime/install-status
 GET /api/app/local-asr-runtime/readiness
 GET /api/app/local-llm/status
 GET /api/app/local-library/read-model
@@ -48,6 +48,7 @@ POST /api/app/api-key-clear
 POST /api/app/api-key-test
 POST /api/app/agent-index
 POST /api/app/article-fetch
+POST /api/app/asr-runtime/install
 POST /api/app/article-save
 POST /api/app/caption-probe
 POST /api/app/capture-inbox-dismiss
@@ -59,7 +60,6 @@ POST /api/app/inbox-review
 POST /api/app/ffmpeg/install
 POST /api/app/inbox-trash
 POST /api/app/local-asr-model/download
-POST /api/app/local-asr-runtime/install
 POST /api/app/local-llm/builtin/install
 POST /api/app/local-asr-report-only-probe
 POST /api/app/meeting-audio-repair
