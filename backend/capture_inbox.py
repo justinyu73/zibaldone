@@ -90,7 +90,7 @@ PDF_MAX_BYTES = 50 * 1024 * 1024
 
 
 class OcrUnavailable(RuntimeError):
-    """本地 OCR 元件（rapidocr-onnxruntime + PyMuPDF）尚未安裝。"""
+    """本地 OCR 能力不可用（PyMuPDF 未裝，或 OCR 引擎包未下載）。"""
 
 
 def _markitdown_text(src: Path) -> str:
@@ -100,23 +100,25 @@ def _markitdown_text(src: Path) -> str:
 
 
 def _ocr_pdf(src: Path) -> str:
-    """掃描型 PDF（無文字層）→ 每頁 render 成圖 → RapidOCR 抽字。本地、零雲端、
-    零金鑰。依賴可選：沒裝時拋 OcrUnavailable，呼叫端回明確提示而非靜默。"""
+    """掃描型 PDF（無文字層）→ 每頁 render 成圖 → OCR 引擎包抽字。本地、零雲端、
+    零金鑰。依賴可選：PyMuPDF 沒裝或 OCR 引擎包未下載時拋 OcrUnavailable，
+    呼叫端回明確提示而非靜默。"""
     try:
         import fitz  # PyMuPDF
-        import numpy as np
-        from rapidocr_onnxruntime import RapidOCR
     except ImportError as exc:
         raise OcrUnavailable(str(exc)) from exc
-    engine = RapidOCR()
+    import local_ocr
+    try:
+        local_ocr.ensure_ready()
+    except local_ocr.LocalOcrUnavailable as exc:
+        raise OcrUnavailable(str(exc)) from exc
     pages: list[str] = []
     with fitz.open(str(src)) as doc:
         for page in doc:
             pix = page.get_pixmap(dpi=200, alpha=False)
-            img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, 3)
-            result, _ = engine(img)
-            if result:
-                pages.append("\n".join(line[1] for line in result))
+            text = local_ocr.extract_text(pix.tobytes("png")).strip()
+            if text:
+                pages.append(text)
     return "\n\n".join(pages).strip()
 
 
@@ -186,8 +188,8 @@ def convert_pdf_capture(vault_root: str, file_relpath: str) -> dict[str, Any]:
             origin = "PDF OCR"
         except OcrUnavailable:
             return {"ok": False, "reason": "ocr_unavailable",
-                    "message": "這是純掃描圖片 PDF，需要 OCR；本機尚未安裝 OCR 元件"
-                               "（pip install rapidocr-onnxruntime PyMuPDF）"}
+                    "message": "這是純掃描圖片 PDF，需要 OCR；請先於無字幕影片流程下載本機 OCR 引擎"
+                               "（開發環境另需 pip install PyMuPDF）"}
         except Exception as exc:  # noqa: BLE001 - OCR 對壞圖丟多種例外
             return {"ok": False, "reason": "ocr_failed", "message": f"OCR 失敗：{exc}"}
         if not text:

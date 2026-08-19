@@ -21,7 +21,8 @@ operation.
 |---|---|---|
 | YouTube caption retrieval | YouTube/caption endpoints | User previews or imports a YouTube source |
 | Captionless-video ASR | YouTube (audio download) → local whisper.cpp | User clicks the ASR fallback on a captionless video (no cloud; local transcription) |
-| Captionless-video OCR | YouTube (temporary low-res download, sampled frames) → local RapidOCR by default, or selected OCR provider when a key is configured | User clicks the OCR fallback on a captionless video (reads hard-burned subtitles; sampled media is temporary) |
+| Captionless-video OCR | YouTube (temporary low-res download, sampled frames) → downloadable local OCR pack by default, or selected OCR provider when a key is configured | User clicks the OCR fallback on a captionless video (reads hard-burned subtitles; sampled media is temporary) |
+| Local OCR engine download | This project's GitHub Release (OCR pack zip + its SHA256SUMS entry) | User clicks the OCR engine install on a captionless video (first use only) |
 | Article extraction | The URL supplied by the user | User requests article fetch |
 | Cloud transcription | Selected transcription provider | User selects a cloud/paid ASR route and confirms |
 | AI translation/summary | OpenAI, Anthropic, or Google | User selects a cloud model and executes the action |

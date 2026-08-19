@@ -276,3 +276,22 @@ def app_asr_runtime_install():
         return asr_runtime.start_install()
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/api/app/ocr-runtime/status")
+def app_ocr_runtime_status():
+    # 本地 OCR 引擎包（RapidOCR，首用下載）就緒狀態＋下載進度。
+    import ocr_runtime
+
+    return ocr_runtime.status()
+
+
+@router.post("/api/app/ocr-runtime/install")
+def app_ocr_runtime_install():
+    # 首用下載 OCR 引擎包（背景執行緒，UI 輪詢 /ocr-runtime/status）。
+    import ocr_runtime
+
+    try:
+        return ocr_runtime.start_install()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc

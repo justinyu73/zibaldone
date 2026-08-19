@@ -27,6 +27,7 @@ GET /api/app/metrics
 GET /api/app/model-options
 GET /api/app/note-asset
 GET /api/app/note-detail
+GET /api/app/ocr-runtime/status
 GET /api/app/radar
 GET /api/app/related-notes
 GET /api/app/retained-artifacts
@@ -72,6 +73,7 @@ POST /api/app/meeting-note-save
 POST /api/app/native-caption-api-probe
 POST /api/app/note-links
 POST /api/app/note-thought
+POST /api/app/ocr-runtime/install
 POST /api/app/radar-dismiss
 POST /api/app/radar-scan
 POST /api/app/route
@@ -107,7 +109,7 @@ class ApiSurfaceContractTests(unittest.TestCase):
         }
 
         self.assertSetEqual(actual, EXPECTED_API_SURFACE)
-        self.assertEqual(len(actual), 83)
+        self.assertEqual(len(actual), 85)
 
 
 if __name__ == "__main__":

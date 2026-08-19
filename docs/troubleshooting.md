@@ -18,6 +18,15 @@ development configuration.
 - On Windows, use a native drive path; the app normalizes legacy WSL paths when
   needed.
 
+## Local OCR is unavailable
+
+The keyless local OCR engine (RapidOCR) is a first-use download, not bundled in
+the installer. On a captionless video, use the in-app **下載本機 OCR 引擎**
+button (about 150 MB, from this project's GitHub Release, sha256-verified
+against the release's SHA256SUMS). Developers can build the pack locally with
+`scripts/build_ocr_pack.sh`. A configured OpenAI key can use the cloud OCR
+route instead.
+
 ## Local ASR is unavailable
 
 Check the local ASR readiness state in the app. On Windows and Linux the video
