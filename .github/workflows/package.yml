@@ -49,6 +49,7 @@ jobs:
         env:
           TAURI_CONFIG: '{"bundle":{"externalBin":[]}}'
       - run: pip install -r backend/requirements.txt pyinstaller
+      - run: bash scripts/use_headless_opencv.sh
       - name: build sidecar (PyInstaller --onedir, per-OS)
         shell: bash
         run: |
