@@ -46,3 +46,6 @@ setup-wsl-sshd.sh
 yt-distill-demo
 yt-meeting-demo
 yt_note_test_meeting.mp3
+
+# user screenshot drop folder (not for tracking)
+docs/drop/
