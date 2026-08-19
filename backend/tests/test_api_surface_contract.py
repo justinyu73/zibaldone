@@ -17,6 +17,7 @@ GET /api/app/ffmpeg/status
 GET /api/app/health
 GET /api/app/inbox
 GET /api/app/local-asr-model/status
+GET /api/app/local-asr-runtime/install-status
 GET /api/app/local-asr-runtime/readiness
 GET /api/app/local-llm/status
 GET /api/app/local-library/read-model
@@ -58,6 +59,7 @@ POST /api/app/inbox-review
 POST /api/app/ffmpeg/install
 POST /api/app/inbox-trash
 POST /api/app/local-asr-model/download
+POST /api/app/local-asr-runtime/install
 POST /api/app/local-llm/builtin/install
 POST /api/app/local-asr-report-only-probe
 POST /api/app/meeting-audio-repair
@@ -105,7 +107,7 @@ class ApiSurfaceContractTests(unittest.TestCase):
         }
 
         self.assertSetEqual(actual, EXPECTED_API_SURFACE)
-        self.assertEqual(len(actual), 81)
+        self.assertEqual(len(actual), 83)
 
 
 if __name__ == "__main__":

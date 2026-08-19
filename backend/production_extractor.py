@@ -27,7 +27,8 @@ CAPS = {
     # as a sanity bound; a 15-min limit needlessly blocked normal long-form videos.
     "max_video_duration_seconds_for_frame_probe": 14400,
     "max_runtime_seconds": 240,
-    "storage_root": "/tmp",
+    # Platform temp dir (Windows has no /tmp; tempfile resolves %TEMP%/TMPDIR).
+    "storage_root": tempfile.gettempdir(),
 }
 
 
@@ -395,7 +396,7 @@ def run_production_extractor(
     provider_cache: Dict[str, Dict[str, Any]] = {}
     provider_call_count = 0
     cleanup_verified = False
-    tmp_root = tempfile.mkdtemp(prefix="vaultwiki_yt_api_extract_", dir="/tmp")
+    tmp_root = tempfile.mkdtemp(prefix="vaultwiki_yt_api_extract_")
     try:
         local_video = _download_lowres_video(target["canonical_url"], Path(tmp_root))
         stream = _probe(ffprobe, local_video)

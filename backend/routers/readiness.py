@@ -162,7 +162,7 @@ def _local_asr_report_only_probe(
     if not whisper.exists() or not model.exists():
         return _blocked_local_asr_report_only_probe("local_asr_runtime_not_ready", "whisper.cpp binary or model is missing")
 
-    tmp_root = Path(tempfile.mkdtemp(prefix=f"vaultwiki_video_intake_local_asr_{video_id}_", dir="/tmp"))
+    tmp_root = Path(tempfile.mkdtemp(prefix=f"vaultwiki_video_intake_local_asr_{video_id}_"))
     sample_path = tmp_root / "local_asr_sample.wav"
     output_prefix = tmp_root / "local_asr_report"
     errors: list[str] = []
@@ -382,6 +382,25 @@ def app_state_health(workspace_root: str = ""):
 @router.get("/api/app/local-asr-runtime/readiness")
 def app_local_asr_runtime_readiness():
     return _local_asr_runtime_readiness()
+
+
+@router.get("/api/app/local-asr-runtime/install-status")
+def app_local_asr_runtime_install_status():
+    import whisper_runtime
+
+    return whisper_runtime.status()
+
+
+@router.post("/api/app/local-asr-runtime/install")
+def app_local_asr_runtime_install():
+    # First-use download of the prebuilt whisper.cpp CLI + ggml-base model
+    # (user-explicit action; same trust pattern as the ffmpeg install).
+    import whisper_runtime
+
+    try:
+        return whisper_runtime.start_install()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.get("/api/app/retained-artifacts")

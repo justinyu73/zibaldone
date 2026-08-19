@@ -20,9 +20,13 @@ development configuration.
 
 ## Local ASR is unavailable
 
-Check the local ASR readiness state in the app. Standard releases do not bundle
-every optional model or WhisperX/Torch stack. Install only the runtime required
-for the selected route or choose a clearly labelled cloud route.
+Check the local ASR readiness state in the app. On Windows and Linux the video
+lane offers a one-time in-app download of the prebuilt whisper.cpp engine and
+base model (about 150 MB, from the official whisper.cpp GitHub release and
+Hugging Face). On macOS, run `backend/setup_asr_runtime.sh` to build the engine
+from source. Standard releases do not bundle every optional model or the
+WhisperX/Torch stack; install only the runtime required for the selected route
+or choose a clearly labelled cloud route.
 
 ## Cloud model fails
 

@@ -100,6 +100,16 @@ app.include_router(providers_router)
 app.include_router(capture_router)
 
 
+@app.exception_handler(Exception)
+async def _unhandled_exception_json(request, exc):  # noqa: ARG001
+    # Registered handlers run inside CORSMiddleware, so this 500 carries CORS
+    # headers — the webview shows the real error instead of a bare
+    # "Failed to fetch" (Starlette's outer ServerErrorMiddleware adds no CORS).
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(status_code=500, content={"detail": f"未預期的後端錯誤：{exc}"})
+
+
 if __name__ == "__main__":
     import uvicorn
 

@@ -30,6 +30,7 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
   const [costs, setCosts] = useState(null) // { quick, deep } estimates
   const [overwriteAsk, setOverwriteAsk] = useState(false)
   const [ffmpegReady, setFfmpegReady] = useState(null) // null=unknown, false, true
+  const [asrState, setAsrState] = useState(null) // null=unknown, { supported, runtime_ready }
   const noCaptions = Boolean(fetched && !enText && !zhText)
   // ASR/OCR need ffmpeg; check readiness when the no-caption fallback appears so we
   // can offer a one-time download instead of failing with "ffmpeg missing".
@@ -38,6 +39,9 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
     let cancelled = false
     apiFetch('/app/ffmpeg/status').then((r) => r.json())
       .then((s) => { if (!cancelled) setFfmpegReady(Boolean(s.ready)) })
+      .catch(() => {})
+    apiFetch('/app/local-asr-runtime/install-status').then((r) => r.json())
+      .then((s) => { if (!cancelled) setAsrState({ supported: Boolean(s.supported), runtime_ready: Boolean(s.runtime_ready) }) })
       .catch(() => {})
     return () => { cancelled = true }
   }, [noCaptions])
@@ -56,6 +60,22 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
       throw new Error('下載逾時')
     } catch (e) {
       setStatus({ type: 'error', message: `媒體工具下載失敗：${e.message}` })
+    } finally { setBusy('') }
+  }
+
+  async function installAsrRuntime() {
+    setBusy('asr-runtime'); setStatus({ type: 'info', message: '下載語音轉錄引擎（whisper.cpp＋模型，約 150MB）中，一次性…' })
+    try {
+      await postJson('/app/local-asr-runtime/install', {})
+      for (let i = 0; i < 400; i++) {
+        await new Promise((r) => setTimeout(r, 1500))
+        const s = await apiFetch('/app/local-asr-runtime/install-status').then((r) => r.json())
+        if (s.runtime_ready) { setAsrState({ supported: true, runtime_ready: true }); setStatus({ type: 'ok', message: '語音轉錄引擎已就緒，可用 ASR。' }); return }
+        if (s.download?.error) throw new Error(s.download.error)
+      }
+      throw new Error('下載逾時')
+    } catch (e) {
+      setStatus({ type: 'error', message: `語音轉錄引擎下載失敗：${e.message}` })
     } finally { setBusy('') }
   }
 
@@ -327,6 +347,12 @@ export default function VideoCapture({ settings, adoptUrl = '' }) {
                   <div className="panel-actions">
                     <button onClick={runVideoAsr} disabled={busy === 'asr'}><Captions size={16} />{busy === 'asr' ? '轉錄中...' : '下載音檔並轉錄（ASR）'}</button>
                     <button onClick={runVideoOcr} disabled={busy === 'ocr'}><FileText size={16} />{busy === 'ocr' ? '讀取中...' : '讀畫面硬字幕（OCR）'}</button>
+                  </div>
+                )}
+                {ffmpegReady !== false && asrState && !asrState.runtime_ready && asrState.supported && (
+                  <div className="panel-actions">
+                    <button className="primary" onClick={installAsrRuntime} disabled={busy === 'asr-runtime'}><Download size={16} />{busy === 'asr-runtime' ? '下載中…' : '下載語音轉錄引擎（whisper.cpp，約 150MB・一次性）'}</button>
+                    <span className="settings-note">ASR 需要 whisper.cpp 引擎與模型；app 自帶下載，不需自行建置。</span>
                   </div>
                 )}
               </div>
