@@ -1,9 +1,9 @@
 <!-- This file is the single mutable state cursor. History = git log -p CURSOR.md -->
 # Cursor
 
-last_commit: 02a4431
+last_commit: e83eda8
 branch: agent/public-release-0-8-4
-last_stage: OCR split into first-use downloadable pack merged (#27) — main sidecar 417→240MB raw; v0.8.9 released (headless swap, no installer effect)
+last_stage: v0.9.0 released — OCR as first-use downloadable pack; installers win 111.5→70.1MB, mac dmg 195.1→103.2MB, mac updater 199.8→105.1MB
 status: PASS
-next_action: release v0.9.0 (OCR pack is a feature-level change: first local-OCR use downloads ~150MB); confirm win/mac installer sizes from that release
+next_action: plan v0.9.x/v0.10 scope; package.yml mac smoke chronic dmg-only false failure still open; Windows budget could revert to 110MB (now 70MB artifact vs 115MB cap)
 open_questions: []
