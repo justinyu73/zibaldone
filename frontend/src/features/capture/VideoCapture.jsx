@@ -41,6 +41,7 @@ export default function VideoCapture({ settings, adoptUrl = '', ready }) {
   const [overwriteAsk, setOverwriteAsk] = useState(false)
   const [ffmpegReady, setFfmpegReady] = useState(null) // null=unknown, false, true
   const [asrReady, setAsrReady] = useState(null) // null=unknown, false, true
+  const [ocrPackReady, setOcrPackReady] = useState(null) // null=unknown, false, true
   const [ocrConsentAsk, setOcrConsentAsk] = useState(false)
   const noCaptions = Boolean(fetched && !enText && !zhText)
   // ASR/OCR need ffmpeg; check readiness when the no-caption fallback appears so we
@@ -61,6 +62,16 @@ export default function VideoCapture({ settings, adoptUrl = '', ready }) {
     let cancelled = false
     apiFetch('/app/asr-runtime/status').then((r) => r.json())
       .then((s) => { if (!cancelled) setAsrReady(Boolean(s.ready)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [noCaptions, ready])
+
+  // 本機 OCR 引擎（RapidOCR）同為首用下載元件；無 API 金鑰時 OCR 按鈕需要它。
+  useEffect(() => {
+    if (!noCaptions || !ready) return undefined
+    let cancelled = false
+    apiFetch('/app/ocr-runtime/status').then((r) => r.json())
+      .then((s) => { if (!cancelled) setOcrPackReady(Boolean(s.ready)) })
       .catch(() => {})
     return () => { cancelled = true }
   }, [noCaptions, ready])
@@ -98,6 +109,24 @@ export default function VideoCapture({ settings, adoptUrl = '', ready }) {
       throw new Error('下載逾時')
     } catch (e) {
       setStatus({ type: 'error', message: `語音轉錄元件下載失敗：${e.message}` })
+    } finally { setBusy('') }
+  }
+
+  async function installOcrRuntime() {
+    if (notReady()) return
+    setBusy('ocr-runtime'); setStatus({ type: 'info', message: '下載本機 OCR 引擎（RapidOCR，約 150MB）中，一次性…' })
+    try {
+      await postJson('/app/ocr-runtime/install', {})
+      for (let i = 0; i < 300; i++) {
+        await new Promise((r) => setTimeout(r, 1500))
+        const s = await apiFetch('/app/ocr-runtime/status').then((r) => r.json())
+        if (s.ready) { setOcrPackReady(true); setStatus({ type: 'ok', message: '本機 OCR 引擎已就緒，可讀畫面硬字幕。' }); return }
+        const err = s.download?.error
+        if (err) throw new Error(err)
+      }
+      throw new Error('下載逾時')
+    } catch (e) {
+      setStatus({ type: 'error', message: `本機 OCR 引擎下載失敗：${e.message}` })
     } finally { setBusy('') }
   }
 
@@ -398,6 +427,12 @@ export default function VideoCapture({ settings, adoptUrl = '', ready }) {
                       <button onClick={runVideoAsr} disabled={busy === 'asr'}><Captions size={16} />{busy === 'asr' ? '轉錄中...' : '下載音檔並轉錄（ASR）'}</button>
                     )}
                     <button onClick={runVideoOcr} disabled={busy === 'ocr'}><FileText size={16} />{busy === 'ocr' ? '讀取中...' : '讀畫面硬字幕（OCR）'}</button>
+                  </div>
+                )}
+                {ffmpegReady !== false && ocrPackReady === false && (
+                  <div className="panel-actions">
+                    <button className="primary" onClick={installOcrRuntime} disabled={busy === 'ocr-runtime'}><Download size={16} />{busy === 'ocr-runtime' ? '下載中…' : '下載本機 OCR 引擎（約 150MB・一次性）'}</button>
+                    <span className="settings-note">無 API 金鑰時「讀畫面硬字幕」需要本機 OCR 引擎；app 自帶下載，不需自行安裝。有金鑰時可直接用雲端 OCR。</span>
                   </div>
                 )}
                 {ocrConsentAsk && (
